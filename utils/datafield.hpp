@@ -7,6 +7,7 @@
 #include <climits>
 #include <cstring>
 #include <type_traits>
+#include <tuple>
 
 class ifield
 {
@@ -141,6 +142,73 @@ private:
     field<T,WidthBits,IsLittleEndian> m_fields[Size];
 };
 
+/**
+ * Base case of collection template
+ */
+template <typename... T>
+class fieldcollection : public serializable, public ifield
+{
+public:
+    fieldcollection() = default;
+
+    void serialize(obitstream& o) const override {
+        //nothing to serialize, empty header
+    } 
+
+    void deserialize(ibitstream& i) override {
+        //nothing to deserialize, empty header
+    }
+
+    static constexpr std::size_t getNbFields() {
+        return 0;
+    }
+
+    static constexpr std::size_t getWidth() {
+        return 0;
+    }
+};
+
+/**
+ * Partial specialization of collection template with >1 data field
+ */
+template<typename T, typename... Rest>
+class fieldcollection<T, Rest...> : public serializable, public ifield
+{
+    static_assert((std::is_base_of<ifield, T>::value && ... && std::is_base_of<ifield, Rest>::value), 
+                    "Collection content must all be data fields");
+public:
+    fieldcollection() = default;
+    fieldcollection(const T& first, const Rest&... rest)
+    : fields(first, rest...) {
+
+    }
+
+    void serialize(obitstream& o) const override {
+        std::apply([&](auto&&... args){ (void(o << args), ...); }, fields);
+    }
+    
+    void deserialize(ibitstream& i) override {
+        std::apply([&](auto&&... args){ (void(i >> args), ...); }, fields);
+    }
+
+    template<std::size_t index>
+    auto& getField() {
+        static_assert(index < (sizeof...(Rest) + 1), "Field index out of range");
+        return std::get<index>(fields);
+    }
+
+    static constexpr std::size_t getNbFields() {
+        return sizeof...(Rest) + 1;
+    }
+
+    static constexpr std::size_t getWidth() {
+        return (T::getWidth() + ... + Rest::getWidth());
+    }
+
+private:
+    //members
+    std::tuple<T, Rest...> fields;
+};
 
 class flag : public field<uint8_t, 1> {
 public:
