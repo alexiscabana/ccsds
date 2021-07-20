@@ -33,13 +33,7 @@ public:
     }
     
     void deserialize(ibitstream& in) override {
-        T tmp;
-        /*in.get(tmp, WidthBits);
-        if constexpr(sizeof(T) > 1 && (isLittleEndian() != isSystemLE())) {
-            // perform byte swap
-            tmp = swapEndian<T>(tmp);
-        }*/
-        m_field = tmp;
+        in.get(m_field, WidthBits, isLittleEndian());
     }
     
     T getValue() const {

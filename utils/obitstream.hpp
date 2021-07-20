@@ -17,10 +17,10 @@ public:
     template<typename T>
     void put(T t, std::size_t width, bool isLittleEndian = false) {
 
-        uint64_t value = *reinterpret_cast<uint64_t*>(&t);
         if(width > sizeof(T)*CHAR_BIT) {
             return; // TODO: maybe set badbit?
         }
+        
         if(isLittleEndian) {
             // least significant bits go first in the stream, per byte
             while(width > 0) {

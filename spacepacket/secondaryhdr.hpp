@@ -11,74 +11,48 @@ namespace ccsds
 {
 
 /**
- * Base case of secondary header template
- */
-template <typename... T>
-class sp_secondaryhdr : public serializable
-{
-public:
-    sp_secondaryhdr() = default;
-
-    void serialize(obitstream& o) const override {
-        //nothing to serialize, empty header
-    } 
-
-    void deserialize(ibitstream& i) override {
-        //nothing to deserialize, empty header
-    }
-
-    static constexpr std::size_t getNbFields() {
-        return 0;
-    }
-
-    static constexpr std::size_t getSizeBits() {
-        return 0;
-    }
-};
-
-/**
  * Partial specialization of secondary header template with >1 data field
  */
-template<typename T, typename... Rest>
-class sp_secondaryhdr<T, Rest...> : public serializable
+template<typename TC, typename Ancilliary>
+class sp_secondaryhdr : public serializable
 {
-    static_assert((std::is_base_of<ifield, T>::value && ... && std::is_base_of<ifield, Rest>::value), 
+    static_assert((std::is_base_of<ifield, TC>::value && std::is_base_of<ifield, Ancilliary>::value), 
                     "Secondary header fields must all be data fields");
-    static_assert((T::getWidth() + ... + Rest::getWidth()) % CHAR_BIT == 0, 
-                    "Spacepacket secondary headers must consist of an integral number of octets (pink book, section 4.1.3.2.1.3)");
-
+    static_assert(TC::getWidth() % CHAR_BIT == 0, 
+                    "Time Code Field must consist of an integral number of octets (pink book, section 4.1.3.2.2.1)");
+    static_assert(Ancilliary::getWidth() % CHAR_BIT == 0, 
+                    "Ancilliary Data Field must consist of an integral number of octets (pink book, section 4.1.3.2.3)");
 public:
     sp_secondaryhdr() = default;
-    sp_secondaryhdr(const T& first, const Rest&... rest)
-    : fields(first, rest...) {
+    sp_secondaryhdr(const TC& tc, const Ancilliary& ancillary)
+    : m_timecode(tc), m_ancilliary(ancillary) {
 
     }
 
     void serialize(obitstream& o) const override {
-        std::apply([&](auto&&... args){ (void(o << args), ...); }, fields);
+        o << m_timecode << m_ancilliary;
     }
     
     void deserialize(ibitstream& i) override {
-        std::apply([&](auto&&... args){ (void(i >> args), ...); }, fields);
+        i >> m_timecode >> m_ancilliary;
     }
 
-    template<std::size_t index>
-    auto& getField() {
-        static_assert(index < (sizeof...(Rest) + 1), "Field index out of range");
-        return std::get<index>(fields);
+    auto& getTCField() {
+        return m_timecode;
     }
 
-    static constexpr std::size_t getNbFields() {
-        return sizeof...(Rest) + 1;
+    auto& getAncilliaryField() {
+        return m_ancilliary;
     }
 
     static constexpr std::size_t getSizeBits() {
-        return (T::getWidth() + ... + Rest::getWidth());
+        return (TC::getWidth() + Ancilliary::getWidth());
     }
 
 private:
     //members
-    std::tuple<T, Rest...> fields;
+    TC m_timecode;
+    Ancilliary m_ancilliary;
 };
 
 } //namespace

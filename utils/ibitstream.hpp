@@ -46,6 +46,7 @@ public:
     }
 private:
     void getBits(uint8_t& byte, std::size_t width) {
+        (void)byte;
         if(width > 0) {
             std::cout << "getting " << width << " bits" << std::endl;
         }
