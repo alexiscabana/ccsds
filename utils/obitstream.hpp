@@ -74,7 +74,6 @@ private:
         if(width > 0) {
             std::bitset<sizeof(uint8_t) * CHAR_BIT> bits(byte);
             std::cout << "putting " << width << " bits: " << bits << std::endl;
-
         }
     }
 

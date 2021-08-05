@@ -44,7 +44,7 @@ public:
     }
 
     const uint8_t* getStart() const override {
-        return static_cast<uint8_t*>(buf_start);
+        return static_cast<const uint8_t*>(buf_start);
     }
 
     std::size_t getSize() const override {

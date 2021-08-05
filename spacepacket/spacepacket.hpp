@@ -48,6 +48,57 @@ private:
     OBitStream      user_data;
 };
 
+/**
+ * Spacepacket Dissector template
+ */
+template<typename SecHdrType, typename ...Fields>
+class SpDissector : public Deserializable
+{
+public:
+    SpDissector() 
+    : is_pri_hdr_provided(false), is_sec_hdr_provided(false) {
+
+    }
+
+    SpDissector(SpPrimaryHeader& pri_hdr)
+    : primary_hdr(pri_hdr), is_pri_hdr_provided(true), is_sec_hdr_provided(false) {
+
+    }
+
+    SpDissector(SpPrimaryHeader& pri_hdr, SecHdrType& sec_hdr)
+    : primary_hdr(pri_hdr), secondary_hdr(sec_hdr), is_pri_hdr_provided(true), is_sec_hdr_provided(true) {
+
+    }
+
+    void deserialize(IBitStream& i) override {
+
+        // Only deserialize primary and secondary headers if they were not already provided at construction
+        if(!is_pri_hdr_provided) {
+            i >> primary_hdr;
+        }
+
+        if(!is_sec_hdr_provided) {
+            i >> secondary_hdr;
+        }
+
+        std::apply([&](auto&&... args){ (void(i >> args), ...); }, field_tuple);
+    }
+
+    template<std::size_t index>
+    auto& getField() {
+        static_assert(index < (sizeof...(Fields) + 1), "Field index out of range");
+        return std::get<index>(field_tuple);
+    }
+
+    SpPrimaryHeader         primary_hdr;
+    SecHdrType              secondary_hdr;
+
+private:
+    std::tuple<Fields...>   field_tuple;
+    bool                    is_pri_hdr_provided;
+    bool                    is_sec_hdr_provided;
+};
+
 } //namespace
 
 #endif //CCSDS_SPACEPACKET_HPP
