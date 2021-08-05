@@ -7,11 +7,11 @@
 namespace ccsds
 {
 
-class sp_primaryhdr : public serializable
+class SpPrimaryHeader : public Serializable, public Deserializable
 {
 public:
     // pink book, section 4.1.2 specifies the bit width of each primary header field
-    enum field_width_bit {
+    enum BitWidthField {
         PACKET_VERSION_WIDTH = 3,
         PACKET_TYPE_WIDTH = 1,
         SECONDARY_HEADER_TYPE_WIDTH = 1,
@@ -21,8 +21,12 @@ public:
         PACKET_LENGTH_WIDTH = 16,
     };
 
-    struct pktversion        : public field<uint8_t, PACKET_VERSION_WIDTH> {};
-    struct pkt_type          : public flag {
+    enum {
+        SIZE = 6
+    };
+    
+    struct PacketVersion        : public Field<uint8_t, PACKET_VERSION_WIDTH> {};
+    struct PacketType           : public Flag {
         bool isTelemetry() const {
             // if bit is 0, packet type is telemetry (pink book, section 4.1.2.3.2.3)
             return !this->isSet();
@@ -33,13 +37,13 @@ public:
             return this->isSet();
         }
     };
-    struct secondaryhdrflag  : public flag {
+    struct SecondaryHdrFlag     : public Flag {
         bool isPresent() const {
             // if bit is 1, there is a secondary header present (pink book, section 4.1.2.3.3.2)
             return this->isSet();
         }
     };
-    struct pktapid           : public field<uint16_t, APID_WIDTH> {
+    struct PacketApid           : public Field<uint16_t, APID_WIDTH> {
         enum {
             IDLE_VALUE = 0b11111111111,
         };
@@ -54,7 +58,7 @@ public:
             this->setValue(IDLE_VALUE);
         }
     };
-    struct seqflags          : public field<uint8_t, SEQUENCE_FLAGS_WIDTH> {
+    struct SequenceFlags        : public Field<uint8_t, SEQUENCE_FLAGS_WIDTH> {
         enum {
             CONTINUATION_VALUE = 0b00,
             FIRST_SEGMENT_VALUE = 0b01,
@@ -82,8 +86,9 @@ public:
             return this->getValue() == UNSEGMENTED_VALUE;
         }
     };
-    struct seqcount          : public field<uint16_t, SEQUENCE_COUNT_WIDTH> {};
-    struct pktlength         : public field<uint16_t> {
+    
+    struct SequenceCount        : public Field<uint16_t, SEQUENCE_COUNT_WIDTH> {};
+    struct PacketLength         : public Field<uint16_t> {
         uint16_t getLength() const {
             // the field contains a length count that equals one fewer than the length (in octets) (pink book, section 4.1.2.5.1.2)
             return this->getValue() + 1;
@@ -95,25 +100,30 @@ public:
         }
     };
     
-    sp_primaryhdr() = default;
-    void serialize(obitstream& o) const override {
-        o << version_field << type_field << sechdrflag_field << apid_field 
-            << sequenceflags_field << sequencecount_field << length_field;
+    SpPrimaryHeader() = default;
+    
+    void serialize(OBitStream& o) const override {
+        o << version << type << sec_hdr_flag << apid 
+            << sequence_flags << sequence_count << length;
     }
     
-    void deserialize(ibitstream& i) override {
-        i >> version_field >> type_field >> sechdrflag_field >> apid_field 
-            >> sequenceflags_field >> sequencecount_field >> length_field;
+    void deserialize(IBitStream& i) override {
+        i >> version >> type >> sec_hdr_flag >> apid 
+            >> sequence_flags >> sequence_count >> length;
+    }
+
+    static constexpr std::size_t getSize() {
+        return SIZE;
     }
 
     //members
-    pktversion          version_field;
-    pkt_type            type_field;
-    secondaryhdrflag    sechdrflag_field;
-    pktapid             apid_field;
-    seqflags            sequenceflags_field;
-    seqcount            sequencecount_field;
-    pktlength           length_field;
+    PacketVersion       version;
+    PacketType          type;
+    SecondaryHdrFlag    sec_hdr_flag;
+    PacketApid          apid;
+    SequenceFlags       sequence_flags;
+    SequenceCount       sequence_count;
+    PacketLength        length;
 };
 
 } //namespace

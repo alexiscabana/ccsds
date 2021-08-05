@@ -9,13 +9,15 @@
 #include <type_traits>
 #include <tuple>
 
-class ifield
+class IField : public Serializable, public Deserializable
 {
 
 };
 
-template<typename T, std::size_t WidthBits = sizeof(T)*CHAR_BIT, bool IsLittleEndian = false>
-class field : public serializable, public ifield
+template<typename T, 
+         std::size_t WidthBits = sizeof(T) * CHAR_BIT, 
+         bool IsLittleEndian = false>
+class Field : public IField
 {
     // template arguments checks
     static_assert(std::is_arithmetic<T>::value, "Field type must be of arthmetic");
@@ -24,24 +26,24 @@ class field : public serializable, public ifield
     static_assert(!std::is_floating_point<T>::value || (sizeof(T) * CHAR_BIT) == WidthBits, "Floating point fields type must be represented in their integral size "
                                                                                             "(IEEE standard)");
 public:
-    field() = default;
-    field(T t): field(t) {}
-    field(T& t): field(t) {}
+    Field() = default;
+    Field(T t): value(t) {}
+    Field(T& t): value(t) {}
 
-    void serialize(obitstream& out) const override {
-        out.put(m_field, WidthBits, isLittleEndian());
+    void serialize(OBitStream& out) const override {
+        out.put(value, WidthBits, isLittleEndian());
     }
     
-    void deserialize(ibitstream& in) override {
-        in.get(m_field, WidthBits, isLittleEndian());
+    void deserialize(IBitStream& in) override {
+        in.get(value, WidthBits, isLittleEndian());
     }
     
     T getValue() const {
-        return m_field;
+        return value;
     }
     
     void setValue(const T t) {
-        m_field = t;
+        value = t;
     }
 
     static constexpr std::size_t getWidth() {
@@ -56,57 +58,60 @@ public:
             std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
     inline bool getBit() const {
         static_assert(n <  WidthBits, "Bit is out of range");
-        return static_cast<bool>((m_field >> n) & 0x1);
+        return static_cast<bool>((value >> n) & 0x1);
     }
     
     template<std::size_t n,
             std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
     inline void setBit(bool bit) {
         static_assert(n <  WidthBits, "Bit is out of range");
-        m_field = bit ? (m_field  | (0x1 << n)) : (m_field  & ~(0x1 << n));
+        value = bit ? (value  | (0x1 << n)) : (value  & ~(0x1 << n));
     }
     
 private:
-    T m_field;
+    T value;
 };
 
 
-template<std::size_t Size, typename T, std::size_t WidthBits = sizeof(T)*CHAR_BIT, bool IsLittleEndian = false>
-class fieldarray : public serializable, public ifield
+template<std::size_t Size, 
+         typename T, std::size_t WidthBits = sizeof(T) * CHAR_BIT, 
+         bool IsLittleEndian = false>
+class FieldArray : public IField
 {
     // template arguments checks
     static_assert(std::is_arithmetic<T>::value, "Field type specified in template must be of arthmetic type");
     static_assert(WidthBits <= (sizeof(T) * CHAR_BIT), "Field width is wider than the field type");
     static_assert(WidthBits > 0, "Field width can't be of width 0");
     static_assert(Size > 0, "Array field must contain at least 1 element");
-    static_assert(!std::is_floating_point<T>::value || (sizeof(T) * CHAR_BIT) == WidthBits, "Floating point fields type must be represented in their integral size "
-                                                                                            "(IEEE standard)");
+    static_assert(!std::is_floating_point<T>::value || (sizeof(T) * CHAR_BIT) == WidthBits, 
+                    "Floating point fields type must be represented in their integral size "
+                    "(IEEE standard)");
 public:
-    fieldarray() = default;
-    fieldarray(T* t, std::size_t s) {
+    FieldArray() = default;
+    FieldArray(T* t, std::size_t s) {
         for(std::size_t i=0; i < std::min<std::size_t>(Size,s); i++) {
-            new (&m_fields[i]) decltype(m_fields[0])(t[i]); 
+            new (&values[i]) decltype(values[0])(t[i]); 
         }
     }
 
-    void serialize(obitstream& out) const override {
+    void serialize(OBitStream& out) const override {
         for(std::size_t i=0; i < Size; i++) {
-            out << m_fields[i];
+            out << values[i];
         }
     }
     
-    void deserialize(ibitstream& in) override {
+    void deserialize(IBitStream& in) override {
         for(std::size_t i=0; i < Size; i++) {
-            in >> m_fields[i];
+            in >> values[i];
         }
     }
     
     T getValue(const std::size_t index) const {
-        return m_fields[index].getValue();
+        return values[index].getValue();
     }
     
     void setValue(const std::size_t index, const T t) {
-        m_fields[index].setValue(t);
+        values[index].setValue(t);
     }
 
     static constexpr std::size_t getWidth() {
@@ -121,36 +126,38 @@ public:
             std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
     inline bool getBit(const std::size_t index) const {
         static_assert(n <  WidthBits, "Bit is out of range");
-        return static_cast<bool>((m_fields[index].getValue() >> n) & 0x1);
+        return static_cast<bool>((values[index].getValue() >> n) & 0x1);
     }
     
     template<std::size_t n,
             std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
     inline void setBit(const std::size_t index, bool bit) {
         static_assert(n <  WidthBits, "Bit is out of range");
-        m_fields[index].setValue(bit ? (m_fields[index].getValue()  | (0x1 << n)) : (m_fields[index].getValue()  & ~(0x1 << n)));
+        values[index].setValue(bit ? (values[index].getValue()  | (0x1 << n)) : (values[index].getValue()  & ~(0x1 << n)));
     }
     
 private:
 
-    field<T,WidthBits,IsLittleEndian> m_fields[Size];
+    Field<T,WidthBits,IsLittleEndian> values[Size];
 };
 
 /**
  * Base case of collection template
  */
 template <typename... T>
-class fieldcollection : public serializable, public ifield
+class FieldCollection : public IField
 {
 public:
-    fieldcollection() = default;
+    FieldCollection() = default;
 
-    void serialize(obitstream& o) const override {
+    void serialize(OBitStream& o) const override {
         //nothing to serialize, empty header
+        (void)o;
     } 
 
-    void deserialize(ibitstream& i) override {
+    void deserialize(IBitStream& i) override {
         //nothing to deserialize, empty header
+        (void)i;
     }
 
     static constexpr std::size_t getNbFields() {
@@ -166,29 +173,29 @@ public:
  * Partial specialization of collection template with >1 data field
  */
 template<typename T, typename... Rest>
-class fieldcollection<T, Rest...> : public serializable, public ifield
+class FieldCollection<T, Rest...> : public IField
 {
-    static_assert((std::is_base_of<ifield, T>::value && ... && std::is_base_of<ifield, Rest>::value), 
+    static_assert((std::is_base_of<IField, T>::value && ... && std::is_base_of<IField, Rest>::value), 
                     "Collection content must all be data fields");
 public:
-    fieldcollection() = default;
-    fieldcollection(const T& first, const Rest&... rest)
-    : fields(first, rest...) {
+    FieldCollection() = default;
+    FieldCollection(const T& first, const Rest&... rest)
+    : field_tuple(first, rest...) {
 
     }
 
-    void serialize(obitstream& o) const override {
-        std::apply([&](auto&&... args){ (void(o << args), ...); }, fields);
+    void serialize(OBitStream& o) const override {
+        std::apply([&](auto&&... args){ (void(o << args), ...); }, field_tuple);
     }
     
-    void deserialize(ibitstream& i) override {
-        std::apply([&](auto&&... args){ (void(i >> args), ...); }, fields);
+    void deserialize(IBitStream& i) override {
+        std::apply([&](auto&&... args){ (void(i >> args), ...); }, field_tuple);
     }
 
     template<std::size_t index>
     auto& getField() {
         static_assert(index < (sizeof...(Rest) + 1), "Field index out of range");
-        return std::get<index>(fields);
+        return std::get<index>(field_tuple);
     }
 
     static constexpr std::size_t getNbFields() {
@@ -201,10 +208,10 @@ public:
 
 private:
     //members
-    std::tuple<T, Rest...> fields;
+    std::tuple<T, Rest...> field_tuple;
 };
 
-class flag : public field<uint8_t, 1> {
+class Flag : public Field<uint8_t, 1> {
 public:
     inline bool isSet() const {
         return this->getBit<0>();

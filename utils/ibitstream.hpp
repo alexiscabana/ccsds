@@ -8,7 +8,7 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define ONES(n)  ((0x1 << (n)) - 1)
 
-class ibitstream
+class IBitStream
 {
 public:
     template<typename T>

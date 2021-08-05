@@ -2,6 +2,7 @@
 #define OBITSTREAM_HPP
 
 #include "utils/endianness.hpp"
+#include "utils/buffer.hpp"
 #include <cstdint>
 #include <climits>
 #include <iostream>
@@ -11,9 +12,14 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define ONES(n)  ((0x1 << (n)) - 1)
 
-class obitstream
+class OBitStream
 {
 public:
+    OBitStream(IBuffer& buf)
+    : buffer(buf), cur_bit_offset(0) {
+
+    }
+
     template<typename T>
     void put(T t, std::size_t width, bool isLittleEndian = false) {
 
@@ -41,14 +47,40 @@ public:
             }
         }
     }
+
+    std::size_t getSize() {
+        return cur_bit_offset / CHAR_BIT;
+    }
+
+    std::size_t getWidth() {
+        return cur_bit_offset;
+    }
+
+    std::size_t getMaxSize() {
+        return buffer.getSize();
+    }
+
+    friend OBitStream& operator<<(OBitStream& out, const OBitStream& other) {
+        // can't transfer an out stream into itself
+        if(&out == &other) {
+            //TODO: set badbit?
+        } else {
+            //TODO: append the other stream
+        }
+        return out;
+    }
 private:
     void putBits(uint8_t byte, std::size_t width) {
         if(width > 0) {
-            std::bitset<sizeof(uint8_t)*CHAR_BIT> bits(byte);
+            std::bitset<sizeof(uint8_t) * CHAR_BIT> bits(byte);
             std::cout << "putting " << width << " bits: " << bits << std::endl;
 
         }
     }
+
+    //members
+    IBuffer& buffer;
+    std::size_t cur_bit_offset;
 };
 
 #endif //OBITSTREAM_HPP

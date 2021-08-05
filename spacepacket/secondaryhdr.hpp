@@ -2,6 +2,7 @@
 #define CCSDS_SECONDARY_HEADER_HPP
 
 #include "utils/serializable.hpp"
+#include "utils/datafield.hpp"
 #include <tuple>
 #include <cstdint>
 #include <climits>
@@ -10,49 +11,64 @@
 namespace ccsds
 {
 
+class ISpSecondaryHeader : public Serializable, public Deserializable
+{
+
+};
+
 /**
- * Partial specialization of secondary header template with >1 data field
+ * Secondary header template
  */
 template<typename TC, typename Ancilliary>
-class sp_secondaryhdr : public serializable
+class SpSecondaryHeader :  public ISpSecondaryHeader
 {
-    static_assert((std::is_base_of<ifield, TC>::value && std::is_base_of<ifield, Ancilliary>::value), 
+    static_assert((std::is_base_of<IField, TC>::value && std::is_base_of<IField, Ancilliary>::value), 
                     "Secondary header fields must all be data fields");
     static_assert(TC::getWidth() % CHAR_BIT == 0, 
                     "Time Code Field must consist of an integral number of octets (pink book, section 4.1.3.2.2.1)");
     static_assert(Ancilliary::getWidth() % CHAR_BIT == 0, 
                     "Ancilliary Data Field must consist of an integral number of octets (pink book, section 4.1.3.2.3)");
 public:
-    sp_secondaryhdr() = default;
-    sp_secondaryhdr(const TC& tc, const Ancilliary& ancillary)
-    : m_timecode(tc), m_ancilliary(ancillary) {
+
+    SpSecondaryHeader() = default;
+
+    SpSecondaryHeader(const TC& tc, const Ancilliary& ancillary)
+    : time_code(tc), ancilliary_data(ancillary) {
 
     }
 
-    void serialize(obitstream& o) const override {
-        o << m_timecode << m_ancilliary;
+    void serialize(OBitStream& o) const override {
+        o << time_code << ancilliary_data;
     }
     
-    void deserialize(ibitstream& i) override {
-        i >> m_timecode >> m_ancilliary;
+    void deserialize(IBitStream& i) override {
+        i >> time_code >> ancilliary_data;
     }
 
-    auto& getTCField() {
-        return m_timecode;
+    static constexpr std::size_t getSize() {
+        return (TC::getWidth() + Ancilliary::getWidth()) / CHAR_BIT;
     }
 
-    auto& getAncilliaryField() {
-        return m_ancilliary;
-    }
-
-    static constexpr std::size_t getSizeBits() {
-        return (TC::getWidth() + Ancilliary::getWidth());
-    }
-
-private:
     //members
-    TC m_timecode;
-    Ancilliary m_ancilliary;
+    TC time_code;
+    Ancilliary ancilliary_data;
+};
+
+/**
+ * Empty secondary header helper class (TC and ancillary fields are 0-sized)
+ */
+class SpEmptySecondaryHeader : public SpSecondaryHeader<FieldCollection<>,
+                                                        FieldCollection<>>
+{
+    void serialize(OBitStream& o) const override {
+        // nothing to serialize
+        (void)o;
+    }
+    
+    void deserialize(IBitStream& i) override {
+        // nothing to deserialize
+        (void)i;
+    }
 };
 
 } //namespace

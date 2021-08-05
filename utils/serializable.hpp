@@ -4,17 +4,23 @@
 #include "utils/ibitstream.hpp"
 #include "utils/obitstream.hpp"
 
-class serializable
+class Serializable
 {
 public:
-    serializable() = default;
-    virtual void serialize(obitstream& o) const = 0;
-    virtual void deserialize(ibitstream& i) = 0;
-    friend obitstream& operator<<(obitstream& o, const serializable& s) {
+    Serializable() = default;
+    virtual void serialize(OBitStream& o) const = 0;
+    friend OBitStream& operator<<(OBitStream& o, const Serializable& s) {
         s.serialize(o);
         return o;
     }
-    friend ibitstream& operator>>(ibitstream& i, serializable& s) {
+};
+
+class Deserializable
+{
+public:
+    Deserializable() = default;
+    virtual void deserialize(IBitStream& i) = 0;
+    friend IBitStream& operator>>(IBitStream& i, Deserializable& s) {
         s.deserialize(i);
         return i;
     }
