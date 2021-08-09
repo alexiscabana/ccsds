@@ -1,20 +1,20 @@
 #ifndef BUFFER_HPP
 #define BUFFER_HPP
 
+#include "utils/printable.hpp"
 #include <cstdint>
-#include <iostream>
 
-class IBuffer
+class IBuffer : public Printable
 {
 public:
     virtual uint8_t*    getStart()       = 0;
     virtual std::size_t getSize()  const = 0;
 
-    void print() {
+    void print() override {
         for(std::size_t i = 0; i < this->getSize(); i++) {
-            std::cout << std::hex << int(*(this->getStart() + i)) << " ";
+            printf("%02X ",*(this->getStart() + i));
         }
-        std::cout << std::endl;
+        printf("\n");
     }
 };
 
