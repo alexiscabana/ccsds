@@ -2,12 +2,20 @@
 #define BUFFER_HPP
 
 #include <cstdint>
+#include <iostream>
 
 class IBuffer
 {
 public:
-    virtual const uint8_t*  getStart() const = 0;
-    virtual std::size_t     getSize()  const = 0;
+    virtual uint8_t*    getStart()       = 0;
+    virtual std::size_t getSize()  const = 0;
+
+    void print() {
+        for(std::size_t i = 0; i < this->getSize(); i++) {
+            std::cout << std::hex << int(*(this->getStart() + i)) << " ";
+        }
+        std::cout << std::endl;
+    }
 };
 
 /**
@@ -20,7 +28,7 @@ class Buffer : public IBuffer
 public:
     Buffer() = default;
 
-    const uint8_t* getStart() const override {
+    uint8_t* getStart() override {
         return &bytes[0];
     }
 
@@ -29,7 +37,7 @@ public:
     }
 
 private:
-    uint8_t bytes[Size];
+    uint8_t bytes[Size] = { 0 };
 };
 
 /**
@@ -39,12 +47,12 @@ class UserBuffer : public IBuffer
 {
 public:
     UserBuffer(void* buffer, std::size_t max_size)
-    : max_size(max_size), buf_start(buffer) {
+    : max_size(max_size), buf_start(static_cast<uint8_t*>(buffer)) {
 
     }
 
-    const uint8_t* getStart() const override {
-        return static_cast<const uint8_t*>(buf_start);
+    uint8_t* getStart() override {
+        return buf_start;
     }
 
     std::size_t getSize() const override {
@@ -53,7 +61,7 @@ public:
     
 private:
     std::size_t max_size;
-    void*       buf_start;
+    uint8_t*    buf_start;
 };
 
 
