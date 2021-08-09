@@ -3,11 +3,12 @@
 
 #include "utils/datafield.hpp"
 #include "utils/serializable.hpp"
+#include "utils/printable.hpp"
 
 namespace ccsds
 {
 
-class SpPrimaryHeader : public Serializable, public Deserializable
+class SpPrimaryHeader : public Serializable, public Deserializable, public Printable
 {
 public:
     // pink book, section 4.1.2 specifies the bit width of each primary header field
@@ -85,6 +86,16 @@ public:
             // sequence flag is '11' if the Space Packet contains unsegmented User Data; (pink book, section 4.1.2.4.2.2d)
             return this->getValue() == UNSEGMENTED_VALUE;
         }
+
+        const char* getName() const {
+            switch(this->getValue() & ONES(SEQUENCE_FLAGS_WIDTH)) {
+                case CONTINUATION_VALUE:  return "Continuation Segment";
+                case FIRST_SEGMENT_VALUE: return "First Segment";
+                case LAST_SEGMENT_VALUE:  return "Last Segment";
+                case UNSEGMENTED_VALUE:   return "Unsegmented";
+                default :                 return "Unkown"; // should never happen, all possibilities are covered
+            }
+        }
     };
     
     struct SequenceCount        : public Field<uint16_t, SEQUENCE_COUNT_WIDTH> {};
@@ -110,6 +121,24 @@ public:
     void deserialize(IBitStream& i) override {
         i >> version >> type >> sec_hdr_flag >> apid 
             >> sequence_flags >> sequence_count >> length;
+    }
+
+    void print() override {
+
+        printf("--- Primary header ---\n");
+        printf("Version     : %u\n", this->version.getValue());
+        printf("Type        : %s\n", (this->type.isTelecommand() ? "Telecommand" : "Telemetry"));
+        printf("Sec. Header : %s\n", (this->sec_hdr_flag.isSet() ? "Present" : "Not Present"));
+        printf("APID        : ");
+        if(this->apid.isIdle()) {
+            printf("Idle ");
+        } else {
+            printf("%u ", this->apid.getValue());
+        }
+        printf("(hex : %02X)\n", this->apid.getValue());
+        printf("Seq. Flags  : %s\n", this->sequence_flags.getName());
+        printf("Seq. Count  : %u\n", this->sequence_count.getValue());
+        printf("Length      : %u\n", this->length.getLength());
     }
 
     static constexpr std::size_t getSize() {
