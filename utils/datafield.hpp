@@ -26,7 +26,10 @@ class Field : public IField
     static_assert(!std::is_floating_point<T>::value || (sizeof(T) * CHAR_BIT) == WidthBits, "Floating point fields type must be represented in their integral size "
                                                                                             "(IEEE standard)");
 public:
-    Field() = default;
+    Field()
+    : value(0) {
+
+    }
     Field(T t): value(t) {}
     Field(T& t): value(t) {}
 
@@ -43,7 +46,7 @@ public:
     }
     
     void setValue(const T t) {
-        value = t;
+        value = t & ONES(WidthBits);
     }
 
     static constexpr std::size_t getWidth() {
@@ -61,11 +64,25 @@ public:
         return static_cast<bool>((value >> n) & 0x1);
     }
     
+    inline bool getBit(std::size_t n) const {
+        if(n < WidthBits) {
+            return static_cast<bool>((value >> n) & 0x1);
+        } else {
+            return false;
+        }
+    }
+    
     template<std::size_t n,
             std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
     inline void setBit(bool bit) {
         static_assert(n <  WidthBits, "Bit is out of range");
         value = bit ? (value  | (0x1 << n)) : (value  & ~(0x1 << n));
+    }
+    
+    inline void setBit(std::size_t n, bool bit) {
+        if(n < WidthBits) {
+            value = bit ? (value  | (0x1 << n)) : (value  & ~(0x1 << n));
+        }
     }
     
 private:
