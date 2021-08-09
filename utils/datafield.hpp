@@ -91,7 +91,8 @@ private:
 
 
 template<std::size_t Size, 
-         typename T, std::size_t WidthBits = sizeof(T) * CHAR_BIT, 
+         typename T, 
+         std::size_t WidthBits = sizeof(T) * CHAR_BIT, 
          bool IsLittleEndian = false>
 class FieldArray : public IField
 {
