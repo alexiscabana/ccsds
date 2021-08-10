@@ -56,7 +56,7 @@ public:
     }
 
     std::size_t getSize() const {
-        return cur_bit_offset / CHAR_BIT;
+        return cur_bit_offset / CHAR_BIT + (cur_bit_offset % CHAR_BIT > 0 ? 1 : 0);
     }
 
     std::size_t getWidth() const {
