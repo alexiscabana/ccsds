@@ -49,6 +49,9 @@ public:
             IDLE_VALUE = 0b11111111111,
         };
 
+        PacketApid() = default;
+        PacketApid(uint16_t apid) : Field(apid) {}
+
         bool isIdle() const {
             // for idle packet, the APID shall be all ones (pink book, section 4.1.2.3.4.4)
             return this->getValue() == IDLE_VALUE;
@@ -88,7 +91,7 @@ public:
         }
 
         const char* getName() const {
-            switch(this->getValue() & ONES(SEQUENCE_FLAGS_WIDTH)) {
+            switch(this->getValue()) {
                 case CONTINUATION_VALUE:  return "Continuation Segment";
                 case FIRST_SEGMENT_VALUE: return "First Segment";
                 case LAST_SEGMENT_VALUE:  return "Last Segment";

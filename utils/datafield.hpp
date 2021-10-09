@@ -28,10 +28,12 @@ class Field : public IField
 public:
     Field()
     : value(0) {
-
+        this->setValue(0);
     }
-    Field(T t): value(t) {}
-    Field(T& t): value(t) {}
+    Field(T t): value(t) {
+        this->setValue(t);
+    }
+    //Field(T& t): value(t) {}
 
     void serialize(OBitStream& out) const override {
         out.put(value, WidthBits, isLittleEndian());
@@ -42,7 +44,7 @@ public:
     }
     
     T getValue() const {
-        return value;
+        return value & ONES(WidthBits);
     }
     
     void setValue(const T t) {

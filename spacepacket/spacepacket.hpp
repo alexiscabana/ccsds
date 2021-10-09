@@ -25,11 +25,6 @@ class ISpacepacket
                 "Secondary header type must be of type ISpSecondaryHeader");
 public:
 
-    enum {
-        MIN_SIZE = 7,
-        MAX_SIZE = 65542
-    };
-
     virtual std::size_t getUserDataWidth() = 0;
 
     bool isValid() {
@@ -45,7 +40,7 @@ public:
         }
 
         //A Space Packet shall consist of at least 7 and at most 65542 octets (pink book, 4.1.1.2)
-        if(this->getSize() < MIN_SIZE || this->getSize() > MAX_SIZE) {
+        if(this->getSize() < SPACEPACKET_MIN_SIZE || this->getSize() > SPACEPACKET_MAX_SIZE) {
             return false;
         }
 
@@ -92,7 +87,7 @@ class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 public:
     SpBuilder(IBuffer& user_data_buffer)
     : user_data(user_data_buffer) {
-
+        
     }
 
     void serialize(OBitStream& o) const override {
@@ -109,6 +104,31 @@ public:
         return user_data;
     }
 
+private:
+    OBitStream user_data;
+};
+
+/**
+ * Idle spacepacket template
+ */
+template<uint8_t IdleDataPattern = 0xFFU>
+class SpIdle : public ISpacepacket<SpEmptySecondaryHeader>, public Serializable
+{
+public:
+    SpIdle(IBuffer& user_data_buffer)
+    : user_data(user_data_buffer) {
+
+    }
+
+    void serialize(OBitStream& o) const override {
+        // The user data field must follow primary header in idle packets
+        o << this->primary_hdr << user_data;
+    }
+
+    std::size_t getUserDataWidth() override {
+        return user_data.getWidth();
+    }
+
     void fillIdleData(std::size_t nb_bytes) {
         for(std::size_t i = 0; i < nb_bytes; i++) {
             user_data.put(IdleDataPattern, CHAR_BIT);
@@ -116,7 +136,7 @@ public:
     }
 
 private:
-    OBitStream      user_data;
+    OBitStream& user_data;
 };
 
 /**
