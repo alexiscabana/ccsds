@@ -1,8 +1,8 @@
 #ifndef PACKETTRANSFERSERVICE_HPP
 #define PACKETTRANSFERSERVICE_HPP
 
-#include "spacepacket/spacepacket.hpp"
 #include "spacepacket/primaryhdr.hpp"
+#include "spacepacket/spacepacket.hpp"
 
 namespace ccsds
 {
@@ -46,6 +46,15 @@ class SpTransferService
         ListenerPredicate matcher;
     };
 
+    struct ApidContext {
+        SpPrimaryHeader::SequenceCount next_count;
+    };
+
+    struct Telmetry {
+        std::size_t nb_idle = 0;
+        ApidContext contexes[SpPrimaryHeader::PacketApid::IDLE_VALUE];
+    };
+
 public:
 
     static const std::size_t LISTENERS_MAX_SIZE = 1000;
@@ -55,8 +64,15 @@ public:
         return instance;
     }
 
-    void push(IBuffer& sp) {
-        (void)sp;
+    void pushSpacepacket(SpBuilderBase& sp) {
+        IBitStream istream(sp.getBuffer());
+        SpPrimaryHeader pri_header;
+
+        istream >> pri_header;
+
+        if(pri_header.apid.isIdle()) {
+            telemetry.nb_idle++;
+        }
     }
 
     void registerListener(SpListener* listener) {
@@ -99,11 +115,12 @@ public:
 private:
     SpTransferService()
     : nb_listeners(0) {
-
+        
     }
 
     std::size_t nb_listeners;
     ListenerEntry listenerEntries[LISTENERS_MAX_SIZE];
+    Telmetry telemetry;
 };
 
 } //namespace
