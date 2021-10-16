@@ -11,46 +11,76 @@
 class IBitStream
 {
 public:
+    IBitStream(IBuffer& buf)
+    : buffer(buf), cur_bit_offset(0), bad_bit(false) {
+
+    }
+
     template<typename T>
     void get(T& t, std::size_t width, bool isLittleEndian = false) {
 
-        if(width > sizeof(T)*CHAR_BIT) {
-            return; // TODO: maybe set badbit?
-        } else if(width == 0) {
+        (void)isLittleEndian;
+        std::size_t current_byte_i = this->cur_bit_offset / CHAR_BIT;
+        uint8_t* current_byte = buffer.getStart() + current_byte_i;
+        if(bad_bit) {
+            //invalid operation, can't use a bad stream
             return;
         }
 
-        t = 0; // init value
+        if(width == 0) {
+            return;
+        }
 
-        if(isLittleEndian) {
-            // least significant bits come first in the stream (in byte form)
-            uint8_t currentByte, byteNo = 0 ;
-            do {
-                uint8_t nbBitsToGet = MIN(width, CHAR_BIT);  // take max 8 bits 
-                this->getBits(currentByte, nbBitsToGet);
-                t |= (static_cast<uint64_t>(currentByte) << (byteNo * CHAR_BIT));
-                width -= nbBitsToGet;
-                byteNo++;
-            } while(width > 0);
-        } else {
-            // most significant bits come first in the stream
-            uint8_t currentByte;
-            do {
-                t <<= CHAR_BIT;
-                uint8_t nbBitsToGet = ((width - 1) % CHAR_BIT) + 1; // take minimum 1 bit 
-                this->getBits(currentByte, nbBitsToGet);
-                t |= currentByte;
-                width -= nbBitsToGet;
-            } while(width > 0);
+        if(width > sizeof(T)*CHAR_BIT ||
+           width > buffer.getSize()*CHAR_BIT - cur_bit_offset) {
+            //invalid operation, can't get more bits than the amount given
+            bad_bit = true;
+            return;
+        }
+
+        //init value
+        t = 0;
+        
+        while(width > 0) {
+            // index in the current byte we should be reading from
+            uint8_t bit_index = CHAR_BIT - (cur_bit_offset % CHAR_BIT);
+
+            // get relevant bits of current byte
+            uint8_t nbBitsToGet = MIN(width, bit_index);  // take max 8 bits
+            uint8_t value = (*current_byte >> (bit_index - nbBitsToGet)) & ONES(nbBitsToGet);
+
+            // append bits
+            t <<= nbBitsToGet; 
+            t |= value;
+
+            current_byte++;
+            width          -= nbBitsToGet;
+            cur_bit_offset += nbBitsToGet;
         }
     }
+
+    std::size_t getSize() const {
+        return cur_bit_offset / CHAR_BIT + (cur_bit_offset % CHAR_BIT > 0 ? 1 : 0);
+    }
+
+    std::size_t getWidth() const {
+        return cur_bit_offset;
+    }
+
+    std::size_t getMaxSize() const {
+        return buffer.getSize();
+    }
+
+    bool badBit() {
+        return bad_bit;
+    }
+
 private:
-    void getBits(uint8_t& byte, std::size_t width) {
-        (void)byte;
-        if(width > 0) {
-            std::cout << "getting " << width << " bits" << std::endl;
-        }
-    }
+
+    //members
+    IBuffer& buffer;
+    std::size_t cur_bit_offset;
+    bool bad_bit;
 };
 
 #endif //IBITSTREAM_HPP
