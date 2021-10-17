@@ -18,6 +18,9 @@ enum {
     SPACEPACKET_MAX_SIZE = 65542
 };
 
+/**
+ * Base interface for spacepackets
+ */
 template<typename SecHdrType>
 class ISpacepacket
 {
@@ -137,32 +140,23 @@ private:
 /**
  * Idle spacepacket template
  */
-template<uint8_t IdleDataPattern = 0xFFU>
-class SpIdle : public ISpacepacket<SpEmptySecondaryHeader>, public Serializable
+template<typename PatternType, PatternType IdleDataPattern = 0xFFU>
+class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader>
 {
+    static_assert(std::is_unsigned<PatternType>::value, 
+                    "Only unsigned Idle packet pattern are supported.");
+
 public:
-    SpIdle(IBuffer& user_data_buffer)
-    : user_data(user_data_buffer) {
-
+    SpIdleBuilder(IBuffer& user_data_buffer)
+    : SpBuilder(user_data_buffer) {
+        this->primary_hdr.apid.setValue(SpPrimaryHeader::PacketApid::IDLE_VALUE);
     }
 
-    void serialize(OBitStream& o) const override {
-        // The user data field must follow primary header in idle packets
-        o << this->primary_hdr << user_data;
-    }
-
-    std::size_t getUserDataWidth() override {
-        return user_data.getWidth();
-    }
-
-    void fillIdleData(std::size_t nb_bytes) {
-        for(std::size_t i = 0; i < nb_bytes; i++) {
-            user_data.put(IdleDataPattern, CHAR_BIT);
+    void fillIdleData(std::size_t nb_pattern) {
+        for(std::size_t i = 0; i < nb_pattern; i++) {
+            user_data.put(IdleDataPattern, sizeof(PatternType));
         }
     }
-
-private:
-    OBitStream& user_data;
 };
 
 /**
