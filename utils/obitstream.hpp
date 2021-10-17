@@ -1,8 +1,8 @@
 #ifndef OBITSTREAM_HPP
 #define OBITSTREAM_HPP
 
-#include "utils/endianness.hpp"
 #include "utils/buffer.hpp"
+#include "utils/bitmask.hpp"
 #include <cstdint>
 #include <climits>
 #include <iostream>
@@ -10,7 +10,6 @@
 #include <utility>
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
-#define ONES(n)  ((0x1 << (n)) - 1)
 
 class OBitStream
 {
@@ -57,7 +56,7 @@ public:
             
             //mask relevant bits from value to put
             uint8_t nbBitsToAdd = MIN(bit_index, width);
-            uint8_t value = (t >> (width - nbBitsToAdd)) & ONES(nbBitsToAdd);
+            uint8_t value = (t >> (width - nbBitsToAdd)) & bitmask<uint8_t>(nbBitsToAdd);
 
             //append relevant bits to current byte, at the right position
             uint8_t shift = bit_index - nbBitsToAdd;

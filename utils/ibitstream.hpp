@@ -1,12 +1,13 @@
 #ifndef IBITSTREAM_HPP
 #define IBITSTREAM_HPP
 
+#include "utils/bitmask.hpp"
+#include "utils/buffer.hpp"
 #include <cstdint>
 #include <climits>
 #include <iostream>
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
-#define ONES(n)  ((0x1 << (n)) - 1)
 
 class IBitStream
 {
@@ -47,7 +48,7 @@ public:
 
             // get relevant bits of current byte
             uint8_t nbBitsToGet = MIN(width, bit_index);  // take max 8 bits
-            uint8_t value = (*current_byte >> (bit_index - nbBitsToGet)) & ONES(nbBitsToGet);
+            uint8_t value = (*current_byte >> (bit_index - nbBitsToGet)) & bitmask<uint8_t>(nbBitsToGet);
 
             // append bits
             t <<= nbBitsToGet; 

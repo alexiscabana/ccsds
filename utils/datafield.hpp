@@ -3,6 +3,7 @@
 
 #include "utils/serializable.hpp"
 #include "utils/endianness.hpp"
+#include "utils/bitmask.hpp"
 #include <cstdint>
 #include <climits>
 #include <cstring>
@@ -33,7 +34,6 @@ public:
     Field(T t): value(t) {
         this->setValue(t);
     }
-    //Field(T& t): value(t) {}
 
     void serialize(OBitStream& out) const override {
         out.put(value, WidthBits, isLittleEndian());
@@ -44,11 +44,11 @@ public:
     }
     
     T getValue() const {
-        return value & ONES(WidthBits);
+        return value & bitmask<uint64_t>(WidthBits);
     }
     
     void setValue(const T t) {
-        value = t & ONES(WidthBits);
+        value = t & bitmask<uint64_t>(WidthBits);
     }
 
     static constexpr std::size_t getWidth() {
