@@ -70,7 +70,8 @@ public:
         }
 
         // Bits 32–47 of the Packet Primary Header shall contain the Packet Data Length. (pink book, 4.1.2.5.1.1)
-        if(primary_hdr.length.getLength() != this->getSize()) {
+        if(primary_hdr.length.getLength() != 
+            (this->getUserDataWidth() / CHAR_BIT + SecHdrType::getSize())) {
             return false;
         }
 
@@ -94,15 +95,17 @@ class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 {
 public:
     SpBuilder(IBuffer& buffer)
-    : user_data(buffer), buffer(buffer) {
-        //write bogus data to drive the stream forward until the user data field
-        user_data << this->primary_hdr << this->secondary_hdr;
+    : user_data_buffer(buffer.getStart() + SpPrimaryHeader::getSize() + SecHdrType::getSize(),
+                       buffer.getSize() - SpPrimaryHeader::getSize() - SecHdrType::getSize()),
+      user_data(user_data_buffer), 
+      total_buffer(buffer) {
+
     }
 
     void serialize(OBitStream& o) const override {
         // If present, the Packet Secondary Header shall follow, without gap, the Packet Primary Header (pink book,4.1.3.2.1.1)
         // The user data field must also follow the secondary header (or primary header if no secondary header) (pink book, 4.1.3.3.1)
-        o << user_data;
+        o << this->primary_hdr << this->secondary_hdr << user_data;
     }
     
     std::size_t getUserDataWidth() override {
@@ -114,7 +117,7 @@ public:
     }
 
     void finalize() {
-        // serialize the primary and secondary header using the same buffer, but at
+        // serialize the primary and secondary header using the same complete buffer, but at
         // the beginning
         OBitStream beginning(this->getBuffer());
 
@@ -122,19 +125,22 @@ public:
             this->primary_hdr.sec_hdr_flag.set();
         }
 
-        // This  16-bit  field  shall  contain  a  length  count  C  that  equals  one  fewer  than  the  length (in octets) of the Packet Data Field (pink book, 4.1.2.5.1.2)
-        this->primary_hdr.length.setLength(user_data.getSize() - SpPrimaryHeader::getSize());
+        // [...] field shall contain a length count C that equals [...] the Packet Data Field (pink book, 4.1.2.5.1.2)
+        // Packet Data Field is comprised of the secondary header and the user data
+        this->primary_hdr.length.setLength(SecHdrType::getSize() + user_data.getSize());
 
+        //the first few bytes were skipped to keep space to write both headers
         beginning << this->primary_hdr << this->secondary_hdr;
     }
 
     IBuffer& getBuffer() {
-        return buffer;
+        return total_buffer;
     }
 
 protected:
+    UserBuffer user_data_buffer;
     OBitStream user_data;
-    IBuffer& buffer;
+    IBuffer& total_buffer;
 };
 
 /**
