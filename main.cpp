@@ -5,8 +5,8 @@
 Write your code in this editor and press "Run" button to compile and execute it.
 
 *******************************************************************************/
-#include "utils/obitstream.hpp"
 #include "utils/ibitstream.hpp"
+#include "utils/obitstream.hpp"
 #include "utils/datafield.hpp"
 #include "spacepacket/primaryhdr.hpp"
 #include "spacepacket/secondaryhdr.hpp"
@@ -15,50 +15,43 @@ Write your code in this editor and press "Run" button to compile and execute it.
 #include <iostream>
 #include <cstdint>
 
+class OnReceivePrinter : public ccsds::SpListener {
+    void newSpacepacket(IBuffer& bytes) override {
+        IBitStream in(bytes);
+        ccsds::SpPrimaryHeader pri_hdr;
+
+        in >> pri_hdr;
+
+        std::cout << std::string(80,'-') << std::endl;
+        pri_hdr.print();
+    }
+};
+
+using MySpacepacketContent = FieldCollection<Field<uint32_t>,Field<uint32_t>>;
+using MySecondaryHeader = ccsds::SpSecondaryHeader<FieldCollection<>,
+                                                    Field<uint32_t>>;
 int main()
 {
-    Buffer<32> buf1;
+    OnReceivePrinter printer;
     Buffer<32> buf2;
-    OBitStream os(buf1);
-    //IBitStream is;
-    //ccsds::sp_primaryhdr h;
-    FieldCollection<FieldArray<3,uint8_t,4>,Field<uint32_t>> collection;
-    ccsds::SpEmptySecondaryHeader empty;
-
-
-    ccsds::SpBuilder<ccsds::SpEmptySecondaryHeader> builder(buf2);
-    using MySpacepacketContent = FieldCollection<FieldArray<3,uint8_t,4>,Field<uint8_t,4>,Field<uint32_t>>;
+    Buffer<256> bufferIdle;
+    ccsds::SpBuilder<MySecondaryHeader> packet(buf2);
+    ccsds::SpIdleBuilder<uint8_t, 0xFFU> idlePacket(bufferIdle);
     
-    
-    ccsds::SpDissector<ccsds::SpEmptySecondaryHeader, MySpacepacketContent> other;
-    
-    //h.sechdrflag.reset();
-
+    MySpacepacketContent collection;
+    collection.getField<0>().setValue(0xBDDDDDDBU);
     collection.getField<1>().setValue(0xFAAAAAAFU);
-    builder.primary_hdr.apid.setIdle();
-    builder.primary_hdr.sequence_flags.setValue(ccsds::SpPrimaryHeader::SequenceFlags::LAST_SEGMENT_VALUE);
-    //os << sec1;
-    //std::cout << "building sp" << std::endl;
-    builder.data() << collection;
-    //std::cout << "outputting" << std::endl;
-    //os << sp;
-    buf2.print();
-    builder.primary_hdr.print();
-    
-    //os << empty;
-    //os << sp;
-    //is >> sec1;
+    packet.secondary_hdr.ancilliary_data.setValue(0x19999991U);
+    packet.data() << collection;
 
-    ccsds::SpTransferService::getInstance();
-    
-    /*
-    std::cout << sec1.getNbFields() << std::endl;
-    std::cout << sec2.getNbFields() << std::endl;
-    */
-    //std::cout << builder.getUserDataWidth() << std::endl;
-    //std::cout << builder.isValid() << std::endl;
+    idlePacket.fillIdleData(250);
 
-    //std::cout << static_cast<unsigned int>(sec1.getField<1>().getValue()) << std::endl;
-    
+    // test the transfer service
+    ccsds::SpTransferService::getInstance().registerListener(&printer); // will print all spacepackets
+    ccsds::SpTransferService::getInstance().transmit(packet);
+    ccsds::SpTransferService::getInstance().transmit(idlePacket);
+    ccsds::SpTransferService::getInstance().transmit(idlePacket);
+    ccsds::SpTransferService::getInstance().transmit(idlePacket);
+        
     return 0;
 }

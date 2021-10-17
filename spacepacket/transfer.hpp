@@ -53,7 +53,12 @@ class SpTransferService
     };
 
     struct Telmetry {
-        ApidContext contexes[SpPrimaryHeader::PacketApid::IDLE_VALUE];
+        std::size_t tx_rx_count = 0;
+        std::size_t rx_count = 0;
+        std::size_t tx_count = 0;
+        std::size_t tx_rx_error_count = 0;
+        std::size_t rx_error_count = 0;
+        std::size_t tx_error_count = 0;
     };
 
 public:
@@ -67,8 +72,20 @@ public:
 
     template<typename SecHdr>
     void transmit(SpBuilder<SecHdr>& sp) {
+        //set the sequence count depending on the context of the sender's APID
+        uint16_t apid_value = sp.primary_hdr.apid.getValue();
+        sp.primary_hdr.sequence_count = this->contexes[apid_value].next_count;
         sp.finalize();
-        this->transmitBuffer(sp.getBuffer());
+
+        // only send valid packets
+        if(sp.isValid()) {
+            this->transmitBuffer(apid_value, sp.getBuffer());
+            this->telemetry.tx_count++;
+            this->telemetry.tx_rx_count++;
+        } else {
+            this->telemetry.tx_error_count++;
+            this->telemetry.tx_rx_error_count++;
+        }
     }
 
     void registerListener(SpListener* listener) {
@@ -114,22 +131,16 @@ private:
         
     }
 
-    void transmitBuffer(IBuffer& buffer) {
-        IBitStream istream(buffer);
-        SpPrimaryHeader pri_header;
+    void transmitBuffer(uint16_t apid_value, IBuffer& buffer) {
+        //listeners have to be notified of this new spacepacket
+        this->notifyListeners(SpPrimaryHeader::PacketApid(apid_value), buffer);
 
-        istream >> pri_header;
-
-        //update current context
-        auto apid_value = pri_header.apid.getValue();
+        //update current context of the APID
         ++contexes[apid_value].tx_count;
         ++contexes[apid_value].next_count;
-
-        //listeners have to be notified of this new spacepacket
-        this->notifyListeners(pri_header.apid, buffer);
     }
 
-    void notifyListeners(SpPrimaryHeader::PacketApid& apid, IBuffer& buffer) {
+    void notifyListeners(SpPrimaryHeader::PacketApid apid, IBuffer& buffer) {
         for(uint32_t i = 0; i < nb_listeners; i++) {
             if(listenerEntries[i].matcher(apid)) {
                 listenerEntries[i].listener->newSpacepacket(buffer);
