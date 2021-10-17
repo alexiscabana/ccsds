@@ -25,6 +25,8 @@ class ISpacepacket
                 "Secondary header type must be of type ISpSecondaryHeader");
 public:
 
+    typedef SecHdrType SecondaryHdrType;
+
     virtual std::size_t getUserDataWidth() = 0;
 
     bool hasSecondaryHdr() {
@@ -84,32 +86,13 @@ public:
 /**
  * Spacepacket builder template
  */
-class SpBuilderBase {
-public:
-    SpBuilderBase(IBuffer& buffer)
-    : buffer(buffer) {
-
-    }
-
-    IBuffer& getBuffer() {
-        return buffer;
-    }
-
-protected:
-    IBuffer& buffer;
-};
-
-
-/**
- * Spacepacket builder template
- */
 template<typename SecHdrType,
         uint8_t IdleDataPattern = 0xFFU> // Pattern of Idle Data is set by the mission
-class SpBuilder : public SpBuilderBase, public ISpacepacket<SecHdrType>, public Serializable
+class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 {
 public:
     SpBuilder(IBuffer& buffer)
-    : SpBuilderBase(buffer), user_data(buffer) {
+    : buffer(buffer), user_data(buffer) {
         //write bogus data to drive the stream forward until the user data field
         user_data << this->primary_hdr << this->secondary_hdr;
     }
@@ -143,8 +126,13 @@ public:
         beginning << this->primary_hdr << this->secondary_hdr;
     }
 
+    IBuffer& getBuffer() {
+        return buffer;
+    }
+
 private:
     OBitStream user_data;
+    IBuffer& buffer;
 };
 
 /**
