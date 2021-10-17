@@ -64,7 +64,8 @@ public:
         return instance;
     }
 
-    void pushSpacepacket(SpBuilderBase& sp) {
+    template<typename SecHdr>
+    void pushSpacepacket(SpBuilder<SecHdr>& sp) {
         IBitStream istream(sp.getBuffer());
         SpPrimaryHeader pri_header;
 

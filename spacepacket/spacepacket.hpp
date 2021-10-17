@@ -86,8 +86,7 @@ public:
 /**
  * Spacepacket builder template
  */
-template<typename SecHdrType,
-        uint8_t IdleDataPattern = 0xFFU> // Pattern of Idle Data is set by the mission
+template<typename SecHdrType> // Pattern of Idle Data is set by the mission
 class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 {
 public:
