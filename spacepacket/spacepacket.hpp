@@ -154,7 +154,7 @@ public:
 
     void fillIdleData(std::size_t nb_pattern) {
         for(std::size_t i = 0; i < nb_pattern; i++) {
-            user_data.put(IdleDataPattern, sizeof(PatternType));
+            user_data.put(IdleDataPattern, sizeof(PatternType)*CHAR_BIT);
         }
     }
 };
