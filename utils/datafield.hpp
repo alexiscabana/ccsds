@@ -27,6 +27,8 @@ class Field : public IField
     static_assert(!std::is_floating_point<T>::value || (sizeof(T) * CHAR_BIT) == WidthBits, "Floating point fields type must be represented in their integral size "
                                                                                             "(IEEE standard)");
 public:
+    typedef T value_type;
+
     Field()
     : value(0) {
         this->setValue(0);
@@ -85,6 +87,30 @@ public:
         if(n < WidthBits) {
             value = bit ? (value  | (0x1 << n)) : (value  & ~(0x1 << n));
         }
+    }
+
+    template<std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
+    auto& operator++() {
+        setValue(getValue() + 1);
+        return *this;
+    }
+    template<std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
+    auto operator++(int) {
+        Field<T, WidthBits, IsLittleEndian> ret(getValue());
+        setValue(getValue() + 1);
+        return ret;
+    }
+
+    template<std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
+    auto& operator--() {
+        setValue(getValue() - 1);
+        return *this;
+    }
+    template<std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
+    auto operator--(int) {
+        Field<T, WidthBits, IsLittleEndian> ret(getValue());
+        setValue(getValue() - 1);
+        return ret;
     }
     
 private:
