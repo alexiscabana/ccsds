@@ -94,7 +94,7 @@ class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 {
 public:
     SpBuilder(IBuffer& buffer)
-    : buffer(buffer), user_data(buffer) {
+    : user_data(buffer), buffer(buffer) {
         //write bogus data to drive the stream forward until the user data field
         user_data << this->primary_hdr << this->secondary_hdr;
     }
@@ -132,7 +132,7 @@ public:
         return buffer;
     }
 
-private:
+protected:
     OBitStream user_data;
     IBuffer& buffer;
 };
