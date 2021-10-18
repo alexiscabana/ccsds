@@ -105,6 +105,14 @@ public:
         }
         return out;
     }
+
+    template<typename T,
+             std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
+    friend OBitStream& operator<<(OBitStream& out, T value) {
+        out.put(value, sizeof(T)*CHAR_BIT);
+        return out;
+    }
+
 private:
 
     //members

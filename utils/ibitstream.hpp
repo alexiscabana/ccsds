@@ -76,6 +76,14 @@ public:
         return bad_bit;
     }
 
+
+    template<typename T,
+             std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
+    friend IBitStream& operator>>(IBitStream& in, T& value) {
+        in.get(value, sizeof(T)*CHAR_BIT);
+        return in;
+    }
+
 private:
 
     //members
