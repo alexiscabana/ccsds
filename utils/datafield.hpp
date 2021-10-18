@@ -257,6 +257,9 @@ private:
     std::tuple<T, Rest...> field_tuple;
 };
 
+/**
+ * Special case of a 1-bit field
+ */
 class Flag : public Field<uint8_t, 1> {
 public:
     inline bool isSet() const {
@@ -271,5 +274,10 @@ public:
         this->setBit<0>(false);
     }
 };
+
+/**
+ * Special case of a 0-bit field (empty)
+ */
+using FieldEmpty = FieldCollection<>;
 
 #endif //DATAFIELD_HPP
