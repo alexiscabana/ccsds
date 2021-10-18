@@ -129,7 +129,7 @@ public:
     void print() override {
         printf("Version     : %u\n", this->version.getValue());
         printf("Type        : %s\n", (this->type.isTelecommand() ? "Telecommand" : "Telemetry"));
-        printf("Sec. Header : %s\n", (this->sec_hdr_flag.isSet() ? "Present" : "Not Present"));
+        printf("Sec. Header : %s\n", (this->sec_hdr_flag.isSet() ? "Yes" : "No"));
         printf("APID        : ");
         if(this->apid.isIdle()) {
             printf("Idle ");
