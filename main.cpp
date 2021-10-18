@@ -24,19 +24,28 @@ class OnReceivePrinter : public ccsds::SpListener {
 
         std::cout << std::string(80,'-') << std::endl;
         pri_hdr.print();
+
+        if(!pri_hdr.apid.isIdle()) {
+            bytes.print();
+        }
     }
 };
 
 using MySpacepacketContent = FieldCollection<Field<uint32_t>,Field<uint32_t>>;
 using MySecondaryHeader = ccsds::SpSecondaryHeader<FieldCollection<>,
                                                     Field<uint32_t>>;
+
+using MySpacepacket = ccsds::SpBuilder<MySecondaryHeader>;
+using MyIdleSpacepacket = ccsds::SpIdleBuilder<uint8_t, 0xFFU>;
 int main()
 {
     OnReceivePrinter printer;
-    Buffer<32> buf2;
+
+    Buffer<18> buf2;
     Buffer<256> bufferIdle;
-    ccsds::SpBuilder<MySecondaryHeader> packet(buf2);
-    ccsds::SpIdleBuilder<uint8_t, 0xFFU> idlePacket(bufferIdle);
+
+    MySpacepacket packet(buf2);
+    MyIdleSpacepacket idlePacket(bufferIdle);
     
     MySpacepacketContent collection;
     collection.getField<0>().setValue(0xBDDDDDDBU);
@@ -44,14 +53,13 @@ int main()
     packet.secondary_hdr.ancilliary_data.setValue(0x19999991U);
     packet.data() << collection;
 
-    idlePacket.fillIdleData(250);
+    idlePacket.fillIdleData(25);
 
     // test the transfer service
     ccsds::SpTransferService::getInstance().registerListener(&printer); // will print all spacepackets
     ccsds::SpTransferService::getInstance().transmit(packet);
     ccsds::SpTransferService::getInstance().transmit(idlePacket);
     ccsds::SpTransferService::getInstance().transmit(idlePacket);
-    ccsds::SpTransferService::getInstance().transmit(idlePacket);
-        
+
     return 0;
 }
