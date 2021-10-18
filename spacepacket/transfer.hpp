@@ -3,18 +3,10 @@
 
 #include "spacepacket/primaryhdr.hpp"
 #include "spacepacket/spacepacket.hpp"
+#include "spacepacket/listener.hpp"
 
 namespace ccsds
 {
-
-/**
- * Listener of new spacepackets received 
- */
-class SpListener
-{
-public:
-    virtual void newSpacepacket(IBuffer& bytes) = 0;
-};
 
 /**
  * Service of spacepacket transfer
