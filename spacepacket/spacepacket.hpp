@@ -144,6 +144,28 @@ protected:
 };
 
 /**
+ * Idle spacepacket template
+ */
+template<typename PatternType, PatternType IdleDataPattern = 0xFFU>
+class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader>
+{
+    static_assert(std::is_unsigned<PatternType>::value, 
+                    "Only unsigned Idle packet pattern are supported.");
+
+public:
+    SpIdleBuilder(IBuffer& user_data_buffer)
+    : SpBuilder(user_data_buffer) {
+        this->primary_hdr.apid.setValue(SpPrimaryHeader::PacketApid::IDLE_VALUE);
+    }
+
+    void fillIdleData(std::size_t nb_pattern) {
+        for(std::size_t i = 0; i < nb_pattern; i++) {
+            user_data.put(IdleDataPattern, sizeof(PatternType)*CHAR_BIT);
+        }
+    }
+};
+
+/**
  * Spacepacket extractor template
  */
 template<typename SecHdrType>
@@ -172,28 +194,6 @@ public:
 protected:
     IBitStream stream;
     IBuffer& buffer;
-};
-
-/**
- * Idle spacepacket template
- */
-template<typename PatternType, PatternType IdleDataPattern = 0xFFU>
-class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader>
-{
-    static_assert(std::is_unsigned<PatternType>::value, 
-                    "Only unsigned Idle packet pattern are supported.");
-
-public:
-    SpIdleBuilder(IBuffer& user_data_buffer)
-    : SpBuilder(user_data_buffer) {
-        this->primary_hdr.apid.setValue(SpPrimaryHeader::PacketApid::IDLE_VALUE);
-    }
-
-    void fillIdleData(std::size_t nb_pattern) {
-        for(std::size_t i = 0; i < nb_pattern; i++) {
-            user_data.put(IdleDataPattern, sizeof(PatternType)*CHAR_BIT);
-        }
-    }
 };
 
 /**
