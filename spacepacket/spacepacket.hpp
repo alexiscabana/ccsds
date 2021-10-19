@@ -90,7 +90,7 @@ public:
 /**
  * Spacepacket builder template
  */
-template<typename SecHdrType> // Pattern of Idle Data is set by the mission
+template<typename SecHdrType>
 class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 {
 public:
@@ -144,6 +144,37 @@ protected:
 };
 
 /**
+ * Spacepacket extractor template
+ */
+template<typename SecHdrType>
+class SpExtractor : public ISpacepacket<SecHdrType>
+{
+public:
+    SpExtractor(IBuffer& buffer)
+    : stream(buffer), buffer(buffer) {
+        //start by deserializing the two headers
+        stream >> this->primary_hdr >> this->secondary_hdr;
+    }
+
+    std::size_t getUserDataWidth() override {
+        // spacepacket is alreadyformed, so the user data zone is simply described as the complete buffer minus both headers
+        return (buffer.getSize() - SpPrimaryHeader::getSize() - SecHdrType::getSize()) * CHAR_BIT;
+    }
+
+    IBitStream& data() {
+        return stream;
+    }
+
+    IBuffer& getBuffer() {
+        return buffer;
+    }
+
+protected:
+    IBitStream stream;
+    IBuffer& buffer;
+};
+
+/**
  * Idle spacepacket template
  */
 template<typename PatternType, PatternType IdleDataPattern = 0xFFU>
@@ -179,35 +210,9 @@ class SpDissector : public ISpacepacket<SecHdrType>, public Deserializable
     static_assert(SecHdrType::getSize() > 0|| (0 + ... + Fields::getWidth()) > 0, 
                     "There shall be a User Data Field, or a Packet Secondary Header, or both (pink book, 4.1.3.2.1.2 and 4.1.3.3.2)");
 public:
-    SpDissector() 
-    : is_pri_hdr_provided(false), is_sec_hdr_provided(false) {
-
-    }
-
-    SpDissector(SpPrimaryHeader& pri_hdr)
-    : is_pri_hdr_provided(true), is_sec_hdr_provided(false) {
-        this->primary_hdr = pri_hdr;
-    }
-
-    SpDissector(SpPrimaryHeader& pri_hdr, SecHdrType& sec_hdr)
-    : is_pri_hdr_provided(true), is_sec_hdr_provided(true) {
-        this->primary_hdr = pri_hdr;
-        this->secondary_hdr = sec_hdr;
-    }
+    SpDissector() = default;
 
     void deserialize(IBitStream& i) override {
-
-        // Only deserialize primary and secondary headers if they were not already provided at construction
-        if(!is_pri_hdr_provided) {
-            i >> this->primary_hdr;
-            is_pri_hdr_provided = false;
-        }
-
-        if(!is_sec_hdr_provided) {
-            i >> this->secondary_hdr;
-            is_sec_hdr_provided = false;
-        }
-
         std::apply([&](auto&&... args){ (void(i >> args), ...); }, field_tuple);
     }
 
@@ -223,8 +228,6 @@ public:
 
 private:
     std::tuple<Fields...>   field_tuple;
-    bool                    is_pri_hdr_provided;
-    bool                    is_sec_hdr_provided;
 };
 
 } //namespace
