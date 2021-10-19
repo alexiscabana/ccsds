@@ -206,13 +206,18 @@ class SpDissector : public ISpacepacket<SecHdrType>, public Deserializable
     static_assert((true && ... && std::is_base_of<IField, Fields>::value), 
                     "RX Spacepacket fields must all derive from IField");
     static_assert((0 + ... + Fields::getWidth()) % CHAR_BIT == 0, 
-                    "RX Spacepacket definition must fit in an integral number of octet");
-    static_assert(SecHdrType::getSize() > 0|| (0 + ... + Fields::getWidth()) > 0, 
+                    "RX Spacepacket user data field must fit in an integral number of octet");
+    static_assert(SecHdrType::getSize() > 0 || (0 + ... + Fields::getWidth()) > 0, 
                     "There shall be a User Data Field, or a Packet Secondary Header, or both (pink book, 4.1.3.2.1.2 and 4.1.3.3.2)");
 public:
-    SpDissector() = default;
+    SpDissector(IBuffer& buffer) {
+        IBitStream in(buffer);
+        //deserialize everything
+        in >> *this;
+    }
 
     void deserialize(IBitStream& i) override {
+        i >> this->primary_hdr >> this->secondary_hdr;
         std::apply([&](auto&&... args){ (void(i >> args), ...); }, field_tuple);
     }
 
