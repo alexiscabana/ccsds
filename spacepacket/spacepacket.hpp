@@ -201,24 +201,35 @@ protected:
  */
 template<typename SecHdrType, 
         typename ...Fields>
-class SpDissector : public ISpacepacket<SecHdrType>, public Deserializable
+class SpDissector : public ISpacepacket<SecHdrType>, public Deserializable, public Serializable
 {
     static_assert((true && ... && std::is_base_of<IField, Fields>::value), 
-                    "RX Spacepacket fields must all derive from IField");
+                    "Spacepacket fields must all derive from IField");
     static_assert((0 + ... + Fields::getWidth()) % CHAR_BIT == 0, 
-                    "RX Spacepacket user data field must fit in an integral number of octet");
+                    "Spacepacket user data field must fit in an integral number of octet");
     static_assert(SecHdrType::getSize() > 0 || (0 + ... + Fields::getWidth()) > 0, 
                     "There shall be a User Data Field, or a Packet Secondary Header, or both (pink book, 4.1.3.2.1.2 and 4.1.3.3.2)");
 public:
-    SpDissector(IBuffer& buffer) {
+    SpDissector() = default;
+
+    void fromBuffer(IBuffer& buffer) {
         IBitStream in(buffer);
-        //deserialize everything
-        in >> *this;
+        this->deserialize(in);
+    }
+
+    void toBuffer(IBuffer& buffer) {
+        OBitStream out(buffer);
+        this->serialize(out);
     }
 
     void deserialize(IBitStream& i) override {
         i >> this->primary_hdr >> this->secondary_hdr;
         std::apply([&](auto&&... args){ (void(i >> args), ...); }, field_tuple);
+    }
+
+    void serialize(OBitStream& o) const override {
+        o << this->primary_hdr << this->secondary_hdr;
+        std::apply([&](auto&&... args){ (void(o << args), ...); }, field_tuple);
     }
 
     std::size_t getUserDataWidth() override {
