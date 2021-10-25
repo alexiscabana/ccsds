@@ -28,6 +28,10 @@ class SpTransferService
             return matchAll || apid.getValue() == other_apid.getValue();
         }
 
+        bool matchesAll() {
+            return matchAll;
+        }
+
     private:
         SpPrimaryHeader::PacketApid apid;
         bool matchAll;
@@ -44,11 +48,9 @@ class SpTransferService
         SpPrimaryHeader::SequenceCount next_count; //count is 0 by default
     };
 
-    struct Telmetry {
-        std::size_t tx_rx_count = 0;
+    struct Telemetry {
         std::size_t rx_count = 0;
         std::size_t tx_count = 0;
-        std::size_t tx_rx_error_count = 0;
         std::size_t rx_error_count = 0;
         std::size_t tx_error_count = 0;
     };
@@ -71,12 +73,10 @@ public:
 
         // only send valid packets
         if(sp.isValid()) {
-            this->transmitBuffer(apid_value, sp.getBuffer());
+            this->transmitValidBuffer(apid_value, sp.getBuffer(), false);
             this->telemetry.tx_count++;
-            this->telemetry.tx_rx_count++;
         } else {
             this->telemetry.tx_error_count++;
-            this->telemetry.tx_rx_error_count++;
         }
     }
 
@@ -88,8 +88,8 @@ public:
         SpPrimaryHeader::PacketApid any;
 
         // add in watchers
-        listenerEntries[nb_listeners].listener = listener;
-        new (&listenerEntries[nb_listeners].matcher) ListenerPredicate(any, true);
+        listener_entries[nb_listeners].listener = listener;
+        new (&listener_entries[nb_listeners].matcher) ListenerPredicate(any, true);
         nb_listeners++;
     }
 
@@ -101,31 +101,46 @@ public:
         SpPrimaryHeader::PacketApid match(apid_value);
 
         // add in watchers
-        listenerEntries[nb_listeners].listener = listener;
-        new (&listenerEntries[nb_listeners].matcher) ListenerPredicate(match);
+        listener_entries[nb_listeners].listener = listener;
+        new (&listener_entries[nb_listeners].matcher) ListenerPredicate(match);
         nb_listeners++;
     }
 
     void unregisterListener(SpListener* listener) {
         for(uint32_t i = 0; i < nb_listeners; i++) {
-            if(listenerEntries[i].listener == listener) {
+            if(listener_entries[i].listener == listener) {
                 //switch to the listener at the end
-                listenerEntries[i] = listenerEntries[nb_listeners - 1];
+                listener_entries[i] = listener_entries[nb_listeners - 1];
                 nb_listeners--;
                 break;
             }
         }
     }
 
+    void setSubLayerListener(SpListener* listener) {
+        if(listener != nullptr) {
+            sub_layer = listener;
+        }
+    }
+
+    void resetSubLayerListener() {
+        sub_layer = nullptr;
+    }
+
 private:
     SpTransferService()
-    : nb_listeners(0) {
+    : nb_listeners(0), sub_layer(nullptr) {
         
     }
 
-    void transmitBuffer(uint16_t apid_value, IBuffer& buffer) {
+    void transmitValidBuffer(uint16_t apid_value, IBuffer& buffer, bool isSubLayerBuffer) {
         //listeners have to be notified of this new spacepacket
         this->notifyListeners(SpPrimaryHeader::PacketApid(apid_value), buffer);
+
+        // only transmit to sub-layer if the buffer doesn't already come from that layer
+        if(!isSubLayerBuffer && sub_layer != nullptr) {
+            sub_layer->newSpacepacket(buffer);
+        }
 
         //update current context of the APID
         ++contexes[apid_value].tx_count;
@@ -134,16 +149,17 @@ private:
 
     void notifyListeners(SpPrimaryHeader::PacketApid apid, IBuffer& buffer) {
         for(uint32_t i = 0; i < nb_listeners; i++) {
-            if(listenerEntries[i].matcher(apid)) {
-                listenerEntries[i].listener->newSpacepacket(buffer);
+            if(listener_entries[i].matcher(apid)) {
+                listener_entries[i].listener->newSpacepacket(buffer);
             }
         }
     }
 
     std::size_t nb_listeners;
-    ListenerEntry listenerEntries[LISTENERS_MAX_SIZE];
+    ListenerEntry listener_entries[LISTENERS_MAX_SIZE];
+    SpListener* sub_layer;
     ApidContext contexes[SpPrimaryHeader::PacketApid::IDLE_VALUE];
-    Telmetry telemetry;
+    Telemetry telemetry;
 };
 
 } //namespace
