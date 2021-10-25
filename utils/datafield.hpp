@@ -1,3 +1,11 @@
+/**************************************************************************//**
+ * @file datafield.hpp
+ * @author Alexis Cabana-Loriaux
+ * 
+ * @brief Contains utilities for manipulating values and group of values
+ *        that are not necessarily byte-aligned.
+ * 
+ ******************************************************************************/
 #ifndef DATAFIELD_HPP
 #define DATAFIELD_HPP
 
@@ -10,22 +18,41 @@
 #include <type_traits>
 #include <tuple>
 
+/**
+ * @brief Base case of Field
+ */
 class IField : public Serializable, public Deserializable
 {
 
 };
 
+/**
+ * @brief   A field (or value) of a given bit width, that is represented on a given type. The
+ *          types of field allowed are only integral types.
+ *  
+ * @details Fields are used to handle values that might not be byte-aligned, in a standard way.
+ *          At any given moment, only the LSB bits [0..WidthBits] contain the field's value. The
+ *          other bits are considered as "don't care". Fields are powerful when used with 
+ *          bitstreams, because they only serialize/deserialize the amount of bits necessary to
+ *          hold their value.
+ * 
+ * @code    
+ *          Field<uint8_t, 6> field;    // 6-bit field represented on a uint8_t
+ *                                      // Field can thus only take values [0..63]
+ * @endcode 
+ * 
+ * @note    For obvious reasons, the bit width must always be lower than or equal to the bit width  
+ *          of the original type.
+ */
 template<typename T, 
          std::size_t WidthBits = sizeof(T) * CHAR_BIT, 
          bool IsLittleEndian = false>
 class Field : public IField
 {
     // template arguments checks
-    static_assert(std::is_arithmetic<T>::value, "Field type must be of arthmetic");
+    static_assert(std::is_integral<T>::value, "Field type must be of integral type");
     static_assert(WidthBits <= (sizeof(T) * CHAR_BIT), "Field width is wider than the field type");
     static_assert(WidthBits > 0, "Field width can't be of width 0");
-    static_assert(!std::is_floating_point<T>::value || (sizeof(T) * CHAR_BIT) == WidthBits, "Floating point fields type must be represented in their integral size "
-                                                                                            "(IEEE standard)");
 public:
     typedef T value_type;
 
@@ -45,29 +72,45 @@ public:
         in.get(value, WidthBits, isLittleEndian());
     }
     
+    /**
+     * @returns the value contained within the field's bit width
+     */
     T getValue() const {
         return value & bitmask<uint64_t>(WidthBits);
     }
     
+    /**
+     * @brief Sets the value of the field, within the field's bit width
+     */
     void setValue(const T t) {
         value = t & bitmask<uint64_t>(WidthBits);
     }
 
+    /**
+     * @returns the amount of bits that represents the value of the field
+     */
     static constexpr std::size_t getWidth() {
         return WidthBits;
     }
 
+    /**
+     * @returns if the field is represented in little endian
+     */
     static constexpr bool isLittleEndian() {
         return IsLittleEndian;
     }
     
-    template<std::size_t n,
-            std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
+    /**
+     * @returns the boolean state of the bit #n of the field
+     */
+    template<std::size_t n>
     inline bool getBit() const {
-        static_assert(n <  WidthBits, "Bit is out of range");
         return static_cast<bool>((value >> n) & 0x1);
     }
     
+    /**
+     * @returns the boolean state of the bit #n of the field
+     */
     inline bool getBit(std::size_t n) const {
         if(n < WidthBits) {
             return static_cast<bool>((value >> n) & 0x1);
@@ -76,13 +119,23 @@ public:
         }
     }
     
-    template<std::size_t n,
-            std::enable_if_t<!std::is_floating_point<T>::value, bool> = true>
+    /**
+     * @brief Sets the boolean state of the bit #n of the field
+     * 
+     * @param bit The value to set in the bit
+     */
+    template<std::size_t n>
     inline void setBit(bool bit) {
         static_assert(n <  WidthBits, "Bit is out of range");
         value = bit ? (value  | (0x1 << n)) : (value  & ~(0x1 << n));
     }
     
+    /**
+     * @brief Sets the boolean state of the bit #n of the field
+     * 
+     * @param n Which bit to set
+     * @param bit The value to set in the bit
+     */
     inline void setBit(std::size_t n, bool bit) {
         if(n < WidthBits) {
             value = bit ? (value  | (0x1 << n)) : (value  & ~(0x1 << n));
@@ -114,10 +167,18 @@ public:
     }
     
 private:
+    /** Variable of type T to hold the value on a byte-aligned type */
     T value;
 };
 
 
+/**
+ * @brief   An abstract array of fields that are of the same type and bit width. @see{Field}. 
+ *  
+ * @code    
+ *          Field<5, uint8_t, 6> field; // Five (5) 6-bit fields represented on a uint8_t
+ * @endcode 
+ */
 template<std::size_t Size, 
          typename T, 
          std::size_t WidthBits = sizeof(T) * CHAR_BIT, 
@@ -125,13 +186,10 @@ template<std::size_t Size,
 class FieldArray : public IField
 {
     // template arguments checks
-    static_assert(std::is_arithmetic<T>::value, "Field type specified in template must be of arthmetic type");
+    static_assert(std::is_integral<T>::value, "Field type must be of integral type");
     static_assert(WidthBits <= (sizeof(T) * CHAR_BIT), "Field width is wider than the field type");
     static_assert(WidthBits > 0, "Field width can't be of width 0");
     static_assert(Size > 0, "Array field must contain at least 1 element");
-    static_assert(!std::is_floating_point<T>::value || (sizeof(T) * CHAR_BIT) == WidthBits, 
-                    "Floating point fields type must be represented in their integral size "
-                    "(IEEE standard)");
 public:
     FieldArray() = default;
     FieldArray(T* t, std::size_t s) {
@@ -187,9 +245,6 @@ private:
     Field<T,WidthBits,IsLittleEndian> values[Size];
 };
 
-/**
- * Base case of collection template
- */
 template <typename... T>
 class FieldCollection : public IField
 {
@@ -216,7 +271,23 @@ public:
 };
 
 /**
- * Partial specialization of collection template with >1 data field
+ * @brief   A collection of single Fields, FieldArrays or even other FieldCollections.
+ *          Can contain 0 fields (empty collection), and can have a total bit width that is not divisble by 8
+ *          FieldCollections are a simple way to hierarchically organize Fields,
+ *          as well as group them together intuitively in a certain order.
+ *          @see{Field}, @see{FieldArray}. 
+ * 
+ * @details Every field is stored in a multi-type tuple for easy access. De/serializing FieldCollections will
+ *          simply de/serialize each field (in the order specified) by the user.
+ * 
+ * @code    
+ *          FieldCollection<> empty;                    // A collection of zero fields 
+ * 
+ *          FieldCollection<Field<uint8_t, 6>,          // A collection containing multiple fields of different types
+ *                          Field<uint8_t, 4>,          // Note that the total width of my_collection would then be 16 bits
+ *                          FieldArray<3, uint8_t, 2>,
+ *                          FieldCollection<>> my_collection;
+ * @endcode 
  */
 template<typename T, typename... Rest>
 class FieldCollection<T, Rest...> : public IField
@@ -238,45 +309,66 @@ public:
         std::apply([&](auto&&... args){ (void(i >> args), ...); }, field_tuple);
     }
 
+    /**
+     * @returns A reference to the field at position @p index within the collection
+     */
     template<std::size_t index>
     auto& getField() {
         static_assert(index < (sizeof...(Rest) + 1), "Field index out of range");
         return std::get<index>(field_tuple);
     }
 
+    /**
+     * @returns The amount of fields in the collection
+     */
     static constexpr std::size_t getNbFields() {
         return sizeof...(Rest) + 1;
     }
 
+    /**
+     * @returns The combined width of the fields
+     */
     static constexpr std::size_t getWidth() {
         return (T::getWidth() + ... + Rest::getWidth());
     }
 
 private:
-    //members
+    /** Fields present in this collection */
     std::tuple<T, Rest...> field_tuple;
 };
 
 /**
- * Special case of a 1-bit field
+ * @brief   The special case of a 1-bit Field.
+ *          @see{Field}. 
  */
 class Flag : public Field<uint8_t, 1> {
 public:
+
+    /**
+     * @returns true if the flag is set
+     */
     inline bool isSet() const {
         return this->getBit<0>();
     }
 
+    /**
+     * @brief Sets the flag to 1 (true)
+     */
     inline void set() {
         this->setBit<0>(true);
     }
 
+    /**
+     * @brief Sets the flag to 0 (false)
+     */
     inline void reset() {
         this->setBit<0>(false);
     }
 };
 
 /**
- * Special case of a 0-bit field (empty)
+ * @brief   The special case of an empty Field (0-bit Field).
+ *          @see{Field} and @see{FieldCollection}. 
  */
 using FieldEmpty = FieldCollection<>;
 
