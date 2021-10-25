@@ -1,3 +1,10 @@
+/**************************************************************************//**
+ * @file endianness.hpp
+ * @author Alexis Cabana-Loriaux
+ * 
+ * @brief Contains utilities for determining and changing endianness
+ * 
+ ******************************************************************************/
 #ifndef ENDIANNESS_HPP
 #define ENDIANNESS_HPP
 
@@ -6,9 +13,7 @@
 #include <cstdint>
 #include <climits>
 
-#define __LITTLE_ENDIAN__
-
-// endianness check can't be done legally in c++17 (i.e not using undefined behavior  like type punning) without using macros
+// endianness check can't be done legally in c++17 (i.e not using undefined behavior like type punning) without using macros
 #if defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN || \
     defined(__BIG_ENDIAN__) || \
     defined(__ARMEB__) || \
@@ -33,6 +38,9 @@
 #error "I don't know what architecture this is!"
 #endif
 
+/**
+ * @returns true if the system for which this program is compiled, is in little-endian
+ */
 constexpr inline bool isSystemLE() {
 #if defined(ENDIANNESS_BIG)
     return false;
@@ -49,10 +57,15 @@ namespace {
     }
 }
 
-
+/**
+ * @brief A compile-time endianness swap utility.
+ * 
+ * @returns The value when its endianness is swapped
+ * @note Taken from https://stackoverflow.com/questions/36936584/how-to-write-constexpr-swap-function-to-change-endianess-of-an-integer
+ */
 template<typename T,
         typename U = std::make_unsigned_t<T>,
-        std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
+        std::enable_if_t<std::is_integral<T>::value, bool> = true>
 constexpr inline T swapEndian(T t) {
     return swapEndian_impl<U>(t, std::make_index_sequence<sizeof(T)>{});
 }
