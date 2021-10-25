@@ -80,6 +80,23 @@ public:
         }
     }
 
+    template<typename ...T>
+    void transmit(SpDissector<T...>& sp, IBuffer& buffer) {
+        //set the sequence count depending on the context of the sender's APID
+        uint16_t apid_value = sp.primary_hdr.apid.getValue();
+        sp.primary_hdr.sequence_count = this->contexes[apid_value].next_count;
+        sp.finalize();
+
+        // only send valid packets
+        if(sp.isValid()) {
+            sp.toBuffer(buffer);
+            this->transmitValidBuffer(apid_value, buffer, false);
+            this->telemetry.tx_count++;
+        } else {
+            this->telemetry.tx_error_count++;
+        }
+    }
+
     void registerListener(SpListener* listener) {
         if(listener == nullptr || nb_listeners >= LISTENERS_MAX_SIZE) {
             return;

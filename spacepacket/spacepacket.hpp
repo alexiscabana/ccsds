@@ -242,6 +242,16 @@ public:
         return std::get<index>(field_tuple);
     }
 
+    void finalize() {
+        if(this->hasSecondaryHdr()) {
+            this->primary_hdr.sec_hdr_flag.set();
+        }
+
+        // [...] field shall contain a length count C that equals [...] the Packet Data Field (pink book, 4.1.2.5.1.2)
+        // Packet Data Field is comprised of the secondary header and the user data
+        this->primary_hdr.length.setLength(SecHdrType::getSize() + this->getUserDataWidth() / CHAR_BIT);
+    }
+
 private:
     std::tuple<Fields...>   field_tuple;
 };
