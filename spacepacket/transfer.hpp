@@ -109,7 +109,7 @@ public:
         if(!pri_hdr.apid.isIdle()) {
             //validate that the count is sequential
             auto next_count = this->contexes[apid_value].next_count;
-            
+
             if(next_count.getValue() == pri_hdr.sequence_count.getValue()) {
                 this->transmitValidBuffer(apid_value, buffer, true);
                 this->telemetry.rx_count++;
@@ -187,7 +187,8 @@ private:
         }
 
         //update current context of the APID
-        ++contexes[apid_value].tx_count;
+        isSubLayerBuffer ? ++contexes[apid_value].rx_count : 
+                           ++contexes[apid_value].tx_count;
         ++contexes[apid_value].next_count;
     }
 
