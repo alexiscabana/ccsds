@@ -37,6 +37,11 @@ public:
     }
 
     bool isValid() {
+
+        // check first of all if the primary header is valid
+        if(!this->primary_hdr.isValid()) {
+            return false;
+        }
         
         //There shall be a User Data Field, or a Packet Secondary Header, or both (pink book, 4.1.3.2.1.2 and 4.1.3.3.2)
         if(SecHdrType::getSize() == 0 && this->getUserDataWidth() == 0) {
@@ -54,13 +59,8 @@ public:
         }
 
         //[...] ‘1’ if a Packet Secondary Header is present; it shall be ‘0’ if a Packet Secondary Header is not present (pink book, 4.1.2.3.3.2)
-        if((SecHdrType::getSize() == 0 && primary_hdr.sec_hdr_flag.isSet()) || 
-            (SecHdrType::getSize() > 0 && !primary_hdr.sec_hdr_flag.isSet())) {
-            return false;
-        }
-
-        // The Secondary Header Flag shall be set to ‘0’ for Idle Packets. (pink book, 4.1.2.3.3.4)
-        if(primary_hdr.apid.isIdle() && primary_hdr.sec_hdr_flag.isSet()) {
+        if((!hasSecondaryHdr() &&  primary_hdr.sec_hdr_flag.isSet()) || 
+            (hasSecondaryHdr() && !primary_hdr.sec_hdr_flag.isSet())) {
             return false;
         }
 
@@ -131,6 +131,8 @@ public:
 
         //the first few bytes were skipped to keep space to write both headers
         beginning << this->primary_hdr << this->secondary_hdr;
+
+        //TODO check for user data field that is not byte-aligned
     }
 
     IBuffer& getBuffer() {
