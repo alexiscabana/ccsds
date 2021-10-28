@@ -97,6 +97,33 @@ public:
         }
     }
 
+    void receiveFromSubLayer(IBuffer& buffer) {
+        // TODO: validate RX spacepacket
+        // for now just assume SP is valid
+        IBitStream in(buffer);
+        SpPrimaryHeader pri_hdr;
+        in >> pri_hdr;
+
+        uint16_t apid_value = pri_hdr.apid.getValue();
+
+        if(!pri_hdr.apid.isIdle()) {
+            //validate that the count is sequential
+            auto next_count = this->contexes[apid_value].next_count;
+            
+            if(next_count.getValue() == pri_hdr.sequence_count.getValue()) {
+                this->transmitValidBuffer(apid_value, buffer, true);
+                this->telemetry.rx_count++;
+            } else {
+                this->telemetry.rx_error_count++;
+            }
+        }
+        else
+        {
+            this->transmitValidBuffer(apid_value, buffer, true);
+            this->telemetry.rx_count++;
+        }
+    }
+
     void registerListener(SpListener* listener) {
         if(listener == nullptr || nb_listeners >= LISTENERS_MAX_SIZE) {
             return;
