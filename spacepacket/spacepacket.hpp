@@ -155,7 +155,9 @@ protected:
 /**
  * Idle spacepacket template
  */
-template<typename PatternType, PatternType IdleDataPattern = 0xFFU, typename Allocator = DefaultAllocator>
+template<typename PatternType = uint8_t, 
+        PatternType IdleDataPattern = 0xFFU, 
+        typename Allocator = DefaultAllocator>
 class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader, Allocator>
 {
     static_assert(std::is_unsigned<PatternType>::value, 
@@ -165,11 +167,23 @@ public:
     SpIdleBuilder(std::size_t total_size, const Allocator& alloc = Allocator())
     : SpBuilder<SpEmptySecondaryHeader, Allocator>(total_size, alloc) {
         this->primary_hdr.apid.setValue(SpPrimaryHeader::PacketApid::IDLE_VALUE);
-    }
 
-    void fillIdleData(std::size_t nb_pattern) {
-        for(std::size_t i = 0; i < nb_pattern; i++) {
-            this->user_data.put(IdleDataPattern, sizeof(PatternType)*CHAR_BIT);
+        if(total_size > SpPrimaryHeader::getSize()) {
+            std::size_t packet_data_field_size = total_size - SpPrimaryHeader::getSize();
+
+            //Fill all the packet data field bytes to the given pattern
+            std::size_t nb_full_pattern = packet_data_field_size / sizeof(PatternType);
+            uint8_t nb_remainder_bytes  = packet_data_field_size % sizeof(PatternType);
+            
+            for(std::size_t i = 0; i < nb_full_pattern ; i++) {
+                this->user_data.put(IdleDataPattern, sizeof(PatternType)*CHAR_BIT);
+            }
+
+            if(nb_remainder_bytes > 0) {
+                // put the beginning of the pattern as the remainder
+                this->user_data.put((IdleDataPattern >> (sizeof(PatternType) - nb_remainder_bytes)*CHAR_BIT), 
+                                    nb_remainder_bytes*CHAR_BIT);
+            }
         }
     }
 };
