@@ -1,6 +1,7 @@
 #ifndef PACKETTRANSFERSERVICE_HPP
 #define PACKETTRANSFERSERVICE_HPP
 
+#include "utils/allocator.hpp"
 #include "spacepacket/primaryhdr.hpp"
 #include "spacepacket/spacepacket.hpp"
 #include "spacepacket/listener.hpp"
@@ -11,6 +12,7 @@ namespace ccsds
 /**
  * Service of spacepacket transfer
  */
+template<typename Allocator = DefaultAllocator>
 class SpTransferService
 {
     /**
@@ -56,16 +58,15 @@ class SpTransferService
     };
 
 public:
+    SpTransferService(const Allocator& alloc = Allocator())
+    : nb_listeners(0), sub_layer(nullptr), allocator(alloc) {
+        
+    }
 
     static const std::size_t LISTENERS_MAX_SIZE = 1000;
 
-    static SpTransferService& getInstance() {
-        static SpTransferService instance;
-        return instance;
-    }
-
-    template<typename SecHdr>
-    void transmit(SpBuilder<SecHdr>& sp) {
+    template<typename SecHdr, typename A>
+    void transmit(SpBuilder<SecHdr, A>& sp) {
         //set the sequence count depending on the context of the sender's APID
         uint16_t apid_value = sp.primary_hdr.apid.getValue();
         sp.primary_hdr.sequence_count = this->contexes[apid_value].next_count;
@@ -81,7 +82,8 @@ public:
     }
 
     template<typename ...T>
-    void transmit(SpDissector<T...>& sp, IBuffer& buffer) {
+    void transmit(SpDissector<T...>& sp) {
+
         //set the sequence count depending on the context of the sender's APID
         uint16_t apid_value = sp.primary_hdr.apid.getValue();
         sp.primary_hdr.sequence_count = this->contexes[apid_value].next_count;
@@ -89,8 +91,13 @@ public:
 
         // only send valid packets
         if(sp.isValid()) {
+            //serialize to buffer and transmit
+            UserBuffer buffer = this->allocator.allocateBuffer(sp.getSize());
             sp.toBuffer(buffer);
             this->transmitValidBuffer(apid_value, buffer, false);
+
+            //cleanup
+            this->allocator.deallocateBuffer(buffer);
             this->telemetry.tx_count++;
         } else {
             this->telemetry.tx_error_count++;
@@ -172,11 +179,6 @@ public:
     }
 
 private:
-    SpTransferService()
-    : nb_listeners(0), sub_layer(nullptr) {
-        
-    }
-
     void transmitValidBuffer(uint16_t apid_value, IBuffer& buffer, bool isSubLayerBuffer) {
         //listeners have to be notified of this new spacepacket
         this->notifyListeners(SpPrimaryHeader::PacketApid(apid_value), buffer);
@@ -200,10 +202,11 @@ private:
         }
     }
 
+    const Allocator& allocator;
     std::size_t nb_listeners;
     ListenerEntry listener_entries[LISTENERS_MAX_SIZE];
     SpListener* sub_layer;
-    ApidContext contexes[SpPrimaryHeader::PacketApid::IDLE_VALUE];
+    ApidContext contexes[SpPrimaryHeader::PacketApid::IDLE_VALUE + 1];
     Telemetry telemetry;
 };
 

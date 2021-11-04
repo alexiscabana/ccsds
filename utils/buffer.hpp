@@ -82,10 +82,13 @@ public:
      * @param buffer the start address of the memory section to refer to
      * @param max_size the size of the memory section to refer to
      */
+    UserBuffer() = default;
     UserBuffer(void* buffer, std::size_t max_size)
     : max_size(max_size), buf_start(static_cast<uint8_t*>(buffer)) {
 
     }
+    UserBuffer(UserBuffer&  buffer) = default;
+    UserBuffer(UserBuffer&& buffer) = default;
 
     uint8_t* getStart() override {
         return buf_start;
@@ -94,7 +97,14 @@ public:
     std::size_t getSize() const override {
         return max_size;
     }
-    
+
+    UserBuffer& operator=(UserBuffer other)
+    {
+        max_size  = other.max_size;
+        buf_start = other.buf_start;
+        return *this;
+    }
+
 private:
     /** The size of the memory section  */
     std::size_t max_size;

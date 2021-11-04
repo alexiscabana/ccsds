@@ -14,9 +14,19 @@
 class OBitStream
 {
 public:
-    OBitStream(IBuffer& buf)
-    : buffer(buf), cur_bit_offset(0), bad_bit(false) {
+    OBitStream()
+    : cur_buffer(nullptr), cur_bit_offset(0), bad_bit(true) {
 
+    }
+
+    OBitStream(IBuffer& buf)
+    : cur_buffer(&buf), cur_bit_offset(0), bad_bit(false) {
+
+    }
+
+    void attach(IBuffer& buf) {
+        cur_buffer = &buf; 
+        bad_bit = false;
     }
 
     /**
@@ -26,9 +36,6 @@ public:
     void put(T t, std::size_t width, bool isLittleEndian = false) {
 
         (void)isLittleEndian;
-        std::size_t current_byte_i = this->cur_bit_offset / CHAR_BIT;
-        uint8_t* current_byte = buffer.getStart() + current_byte_i;
-
         if(bad_bit) {
             //invalid operation, can't use a bad stream
             return;
@@ -37,6 +44,15 @@ public:
         if(width == 0) {
             return;
         }
+
+        if(cur_buffer == nullptr) {
+            bad_bit = true;
+            return;
+        }
+
+        IBuffer& buffer = *cur_buffer;
+        std::size_t current_byte_i = this->cur_bit_offset / CHAR_BIT;
+        uint8_t* current_byte = buffer.getStart() + current_byte_i;
 
         if(width > sizeof(T)*CHAR_BIT || 
            width > buffer.getSize()*CHAR_BIT - cur_bit_offset) {
@@ -77,7 +93,11 @@ public:
     }
 
     std::size_t getMaxSize() const {
-        return buffer.getSize();
+        if(cur_buffer == nullptr) {
+            return 0;
+        } else {
+            return cur_buffer->getSize();
+        }
     }
 
     bool badBit() {
@@ -87,7 +107,9 @@ public:
     friend OBitStream& operator<<(OBitStream& out, const OBitStream& other) {
 
         // can't transfer an out stream into itself
-        if(&out == &other) {
+        if(&out == &other || 
+            out.cur_buffer == nullptr ||
+            other.cur_buffer == nullptr) {
             out.bad_bit = true;
         } else {
             //append to this stream
@@ -95,12 +117,12 @@ public:
             std::size_t nb_bits       = other.cur_bit_offset % CHAR_BIT;
             
             for(std::size_t i = 0; i < nb_full_bytes; i++) {
-                out.put(*(other.buffer.getStart() + i), CHAR_BIT);
+                out.put(*(other.cur_buffer->getStart() + i), CHAR_BIT);
             }
 
             //might have remainder bits
             if(nb_bits > 0) {
-                out.put(*(other.buffer.getStart() + nb_full_bytes), nb_bits);
+                out.put(*(other.cur_buffer->getStart() + nb_full_bytes), nb_bits);
             }
         }
         return out;
@@ -116,7 +138,7 @@ public:
 private:
 
     //members
-    IBuffer& buffer;
+    IBuffer* cur_buffer;
     std::size_t cur_bit_offset;
     bool bad_bit;
 };

@@ -3,6 +3,7 @@
 
 #include "utils/serializable.hpp"
 #include "utils/buffer.hpp"
+#include "utils/allocator.hpp"
 #include "spacepacket/primaryhdr.hpp"
 #include "spacepacket/secondaryhdr.hpp"
 #include <tuple>
@@ -90,16 +91,21 @@ public:
 /**
  * Spacepacket builder template
  */
-template<typename SecHdrType>
+template<typename SecHdrType, typename Allocator = DefaultAllocator>
 class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 {
 public:
-    SpBuilder(IBuffer& buffer)
-    : user_data_buffer(buffer.getStart() + SpPrimaryHeader::getSize() + SecHdrType::getSize(),
-                       buffer.getSize() - SpPrimaryHeader::getSize() - SecHdrType::getSize()),
-      user_data(user_data_buffer), 
-      total_buffer(buffer) {
-
+    SpBuilder(std::size_t total_size, const Allocator& alloc = Allocator())
+    : allocator(alloc) {
+        // we allocate only the hinted size 
+        total_buffer = this->allocator.allocateBuffer(total_size);
+        //buffer segment where user data will get serialized
+        user_data_buffer = UserBuffer(total_buffer.getStart() + SpPrimaryHeader::getSize() + SecHdrType::getSize(),
+                                      total_buffer.getSize() - SpPrimaryHeader::getSize() - SecHdrType::getSize());
+        user_data.attach(user_data_buffer);
+    }
+    ~SpBuilder() {
+        this->allocator.deallocateBuffer(total_buffer);
     }
 
     void serialize(OBitStream& o) const override {
@@ -140,29 +146,30 @@ public:
     }
 
 protected:
+    const Allocator& allocator;
+    UserBuffer total_buffer;
     UserBuffer user_data_buffer;
     OBitStream user_data;
-    IBuffer& total_buffer;
 };
 
 /**
  * Idle spacepacket template
  */
-template<typename PatternType, PatternType IdleDataPattern = 0xFFU>
-class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader>
+template<typename PatternType, PatternType IdleDataPattern = 0xFFU, typename Allocator = DefaultAllocator>
+class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader, Allocator>
 {
     static_assert(std::is_unsigned<PatternType>::value, 
                     "Only unsigned Idle packet pattern are supported.");
 
 public:
-    SpIdleBuilder(IBuffer& user_data_buffer)
-    : SpBuilder(user_data_buffer) {
+    SpIdleBuilder(std::size_t total_size, const Allocator& alloc = Allocator())
+    : SpBuilder<SpEmptySecondaryHeader, Allocator>(total_size, alloc) {
         this->primary_hdr.apid.setValue(SpPrimaryHeader::PacketApid::IDLE_VALUE);
     }
 
     void fillIdleData(std::size_t nb_pattern) {
         for(std::size_t i = 0; i < nb_pattern; i++) {
-            user_data.put(IdleDataPattern, sizeof(PatternType)*CHAR_BIT);
+            this->user_data.put(IdleDataPattern, sizeof(PatternType)*CHAR_BIT);
         }
     }
 };
