@@ -37,6 +37,16 @@ public:
             // if bit is 1, packet type is telecommand (pink book, section 4.1.2.3.2.3)
             return this->isSet();
         }
+
+        void setTelemetry() {
+            // if bit is 0, packet type is telemetry (pink book, section 4.1.2.3.2.3)
+            this->reset();
+        }
+
+        void setTelecommand() {
+            // if bit is 1, packet type is telecommand (pink book, section 4.1.2.3.2.3)
+            this->set();
+        }
     };
     struct SecondaryHdrFlag     : public Flag {
         bool isPresent() const {
