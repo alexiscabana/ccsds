@@ -12,17 +12,26 @@
 class IBitStream
 {
 public:
-    IBitStream(const IBuffer& buf)
-    : buffer(buf), cur_bit_offset(0), bad_bit(false) {
+    IBitStream()
+    : cur_buffer(nullptr), cur_bit_offset(0), bad_bit(true) {
 
+    }
+
+    IBitStream(const IBuffer& buf)
+    : cur_buffer(&buf), cur_bit_offset(0), bad_bit(false) {
+
+    }
+
+    void attach(const IBuffer& buf) {
+        cur_buffer = &buf; 
+        cur_bit_offset = 0;
+        bad_bit = false;
     }
 
     template<typename T>
     void get(T& t, std::size_t width, bool isLittleEndian = false) {
 
         (void)isLittleEndian;
-        std::size_t current_byte_i = this->cur_bit_offset / CHAR_BIT;
-        uint8_t* current_byte = buffer.getStart() + current_byte_i;
         if(bad_bit) {
             //invalid operation, can't use a bad stream
             return;
@@ -31,6 +40,15 @@ public:
         if(width == 0) {
             return;
         }
+
+        if(cur_buffer == nullptr) {
+            bad_bit = true;
+            return;
+        }
+        
+        const IBuffer& buffer = *cur_buffer;
+        std::size_t current_byte_i = this->cur_bit_offset / CHAR_BIT;
+        uint8_t* current_byte = buffer.getStart() + current_byte_i;
 
         if(width > sizeof(T)*CHAR_BIT ||
            width > buffer.getSize()*CHAR_BIT - cur_bit_offset) {
@@ -69,7 +87,11 @@ public:
     }
 
     std::size_t getMaxSize() const {
-        return buffer.getSize();
+        if(cur_buffer == nullptr) {
+            return 0;
+        } else {
+            return cur_buffer->getSize();
+        }
     }
 
     bool badBit() {
@@ -87,7 +109,7 @@ public:
 private:
 
     //members
-    const IBuffer& buffer;
+    const IBuffer* cur_buffer;
     std::size_t cur_bit_offset;
     bool bad_bit;
 };

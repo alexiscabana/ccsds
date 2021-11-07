@@ -25,13 +25,11 @@ public:
     }
 
     void attach(IBuffer& buf) {
-        cur_buffer = &buf; 
+        cur_buffer = &buf;
+        cur_bit_offset = 0;
         bad_bit = false;
     }
 
-    /**
-     * 
-     */
     template<typename T>
     void put(T t, std::size_t width, bool isLittleEndian = false) {
 
