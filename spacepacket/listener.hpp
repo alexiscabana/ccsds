@@ -12,7 +12,7 @@ namespace ccsds
 class SpListener
 {
 public:
-    virtual void newSpacepacket(IBuffer& bytes) = 0;
+    virtual void newSpacepacket(const IBuffer& bytes) = 0;
 };
 
 } //namespace

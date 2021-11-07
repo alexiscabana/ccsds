@@ -25,7 +25,7 @@ public:
      * 
      * @return The start address
      */
-    virtual uint8_t*    getStart()       = 0;
+    virtual uint8_t*    getStart() const = 0;
 
     /**
      * @brief Get the size of the buffer section
@@ -34,7 +34,7 @@ public:
      */
     virtual std::size_t getSize()  const = 0;
 
-    void print() override {
+    void print() const override {
         for(std::size_t i = 0; i < this->getSize(); i++) {
             printf("%02X ",*(this->getStart() + i));
         }
@@ -53,7 +53,7 @@ class Buffer : public IBuffer
 public:
     Buffer() = default;
 
-    uint8_t* getStart() override {
+    uint8_t* getStart() const override {
         return &bytes[0];
     }
 
@@ -90,7 +90,7 @@ public:
     UserBuffer(UserBuffer&  buffer) = default;
     UserBuffer(UserBuffer&& buffer) = default;
 
-    uint8_t* getStart() override {
+    uint8_t* getStart() const override {
         return buf_start;
     }
 

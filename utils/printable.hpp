@@ -6,7 +6,7 @@
 class Printable
 {
 public:
-    virtual void print() = 0;
+    virtual void print() const = 0;
 };
 
 #endif //PRINTABLE_HPP

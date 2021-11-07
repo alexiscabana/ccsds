@@ -31,13 +31,13 @@ public:
 
     typedef SecHdrType SecondaryHdrType;
 
-    virtual std::size_t getUserDataWidth() = 0;
+    virtual std::size_t getUserDataWidth() const = 0;
 
-    bool hasSecondaryHdr() {
+    bool hasSecondaryHdr() const {
         return SecHdrType::getSize() > 0;
     }
 
-    bool isValid() {
+    bool isValid() const {
 
         // check first of all if the primary header is valid
         if(!this->primary_hdr.isValid()) {
@@ -79,7 +79,7 @@ public:
         return true;
     }
 
-     std::size_t getSize() {
+     std::size_t getSize() const {
         return SpPrimaryHeader::getSize() + SecHdrType::getSize() + (this->getUserDataWidth() / CHAR_BIT) + 
             (this->getUserDataWidth() % CHAR_BIT > 0 ? 1 : 0);
      }
@@ -116,7 +116,7 @@ public:
         o << this->primary_hdr << this->secondary_hdr << user_data;
     }
     
-    std::size_t getUserDataWidth() override {
+    std::size_t getUserDataWidth() const override {
         return user_data.getWidth();
     }
 
@@ -167,7 +167,7 @@ class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader, Allocator>
                     "Only unsigned Idle packet pattern are supported.");
 
 public:
-    SpIdleBuilder(std::size_t total_size, const Allocator& alloc = Allocator())
+    SpIdleBuilder(const std::size_t total_size, const Allocator& alloc = Allocator())
     : SpBuilder<SpEmptySecondaryHeader, Allocator>(total_size, alloc) {
         this->primary_hdr.apid.setValue(SpPrimaryHeader::PacketApid::IDLE_VALUE);
 
@@ -198,13 +198,13 @@ template<typename SecHdrType>
 class SpExtractor : public ISpacepacket<SecHdrType>
 {
 public:
-    SpExtractor(IBuffer& buffer)
+    SpExtractor(const IBuffer& buffer)
     : stream(buffer), buffer(buffer) {
         //start by deserializing the two headers
         stream >> this->primary_hdr >> this->secondary_hdr;
     }
 
-    std::size_t getUserDataWidth() override {
+    std::size_t getUserDataWidth() const override {
         // spacepacket is alreadyformed, so the user data zone is simply described as the complete buffer minus both headers
         return (buffer.getSize() - SpPrimaryHeader::getSize() - SecHdrType::getSize()) * CHAR_BIT;
     }
@@ -213,13 +213,13 @@ public:
         return stream;
     }
 
-    IBuffer& getBuffer() {
+    const IBuffer& getBuffer() {
         return buffer;
     }
 
 protected:
     IBitStream stream;
-    IBuffer& buffer;
+    const IBuffer& buffer;
 };
 
 /**
@@ -238,12 +238,12 @@ class SpDissector : public ISpacepacket<SecHdrType>, public Deserializable, publ
 public:
     SpDissector() = default;
 
-    void fromBuffer(IBuffer& buffer) {
+    void fromBuffer(const IBuffer& buffer) {
         IBitStream in(buffer);
         this->deserialize(in);
     }
 
-    void toBuffer(IBuffer& buffer) {
+    void toBuffer(IBuffer& buffer) const {
         OBitStream out(buffer);
         this->serialize(out);
     }
@@ -258,7 +258,7 @@ public:
         std::apply([&](auto&&... args){ (void(o << args), ...); }, field_tuple);
     }
 
-    std::size_t getUserDataWidth() override {
+    std::size_t getUserDataWidth() const override {
         return (0 + ... + Fields::getWidth());
     }
 

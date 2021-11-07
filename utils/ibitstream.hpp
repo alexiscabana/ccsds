@@ -12,7 +12,7 @@
 class IBitStream
 {
 public:
-    IBitStream(IBuffer& buf)
+    IBitStream(const IBuffer& buf)
     : buffer(buf), cur_bit_offset(0), bad_bit(false) {
 
     }
@@ -87,7 +87,7 @@ public:
 private:
 
     //members
-    IBuffer& buffer;
+    const IBuffer& buffer;
     std::size_t cur_bit_offset;
     bool bad_bit;
 };

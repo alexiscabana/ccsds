@@ -126,7 +126,7 @@ public:
             >> sequence_flags >> sequence_count >> length;
     }
 
-    void print() override {
+    void print() const override {
         printf("Version     : %u\n", this->version.getValue());
         printf("Type        : %s\n", (this->type.isTelecommand() ? "Telecommand" : "Telemetry"));
         printf("Sec. Header : %s\n", (this->sec_hdr_flag.isSet() ? "Yes" : "No"));
@@ -146,7 +146,7 @@ public:
         return SIZE;
     }
 
-    bool isValid() {
+    bool isValid() const {
         // The Secondary Header Flag shall be set to ‘0’ for Idle Packets. (pink book, 4.1.2.3.3.4)
         if(apid.isIdle() && sec_hdr_flag.isSet()) {
             return false;
