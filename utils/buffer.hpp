@@ -68,7 +68,7 @@ private:
 
 /**
  * @brief Template class for a buffer of a given amount of bytes, where
- *        memory is held outside of this instance. UserBuffers are used to 
+ *        memory is held outside of the instance. UserBuffers are used to 
  *        interact with the CCSDS environment while refering to memory already
  *        managed by the user. Destroying this object does not release the memory
  *        pointed to!

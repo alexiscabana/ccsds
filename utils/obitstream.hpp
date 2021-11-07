@@ -1,3 +1,10 @@
+/**************************************************************************//**
+ * @file obitstream.hpp
+ * @author Alexis Cabana-Loriaux
+ * 
+ * @brief Contains a class template for a stream encoder object
+ * 
+ ******************************************************************************/
 #ifndef OBITSTREAM_HPP
 #define OBITSTREAM_HPP
 
@@ -9,27 +16,59 @@
 #include <bitset>
 #include <utility>
 
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-
+/**
+ * @brief Class that provides an absrtaction layer over memory in order to facilitate 
+ *        write operations that are not byte-aligned.
+ * 
+ * @details OBitStreams use an underlying buffer to encode bits. They hold an internal bit offset
+ *          that keeps track of the state of the memory writing. Illegal writing (too large, buffer ended)
+ *          can cause the stream's badbit to be raised, in which case the stream is not usable anymore and 
+ *          cannot be recovered, unless the user attaches a new buffer. Illegal operations do no throw
+ *          exceptions, it is the responsibility of the user to make sure that the stream functions
+ *          correctly.
+ */
 class OBitStream
 {
 public:
+    /**
+     * @brief Construct an OutputBitStream without an underlying buffer. The stream
+     *        is not usable by default (bad bit is set).
+     */
     OBitStream()
     : cur_buffer(nullptr), cur_bit_offset(0), bad_bit(true) {
 
     }
 
+    /**
+     * @brief Construct an OutputBitStream with an underlying buffer.
+     * 
+     * @param buf The buffer to which this stream should encode information
+     */
     OBitStream(IBuffer& buf)
     : cur_buffer(&buf), cur_bit_offset(0), bad_bit(false) {
 
     }
 
+    /**
+     * @brief Change the underlying buffer of this OutputBitStream. 
+     * @note: This operation resets the stream to bit offset 0
+     * 
+     * @param buf The new buffer to which this stream should encode information
+     */
     void attach(IBuffer& buf) {
         cur_buffer = &buf;
         cur_bit_offset = 0;
         bad_bit = false;
     }
 
+    /**
+     * @brief Put an amount of bits in the underlying buffer.
+     * @note The value put in the buffer are the least significant bits of @p t
+     * 
+     * @param t The value that should be encoded.
+     * @param width The amount of bits to put in the buffer.
+     * @param isLittleEndian If the value should be stored in little-endian (least significant byte first).
+     */
     template<typename T>
     void put(T t, std::size_t width, bool isLittleEndian = false) {
 
@@ -69,7 +108,7 @@ public:
             }
             
             //mask relevant bits from value to put
-            uint8_t nbBitsToAdd = MIN(bit_index, width);
+            uint8_t nbBitsToAdd = ((bit_index) < (width) ? (bit_index) : (width));
             uint8_t value = (t >> (width - nbBitsToAdd)) & bitmask<uint8_t>(nbBitsToAdd);
 
             //append relevant bits to current byte, at the right position
@@ -82,14 +121,24 @@ public:
         }
     }
 
+    /**
+     * @return Get the amount of "dirty" bytes that were written to the underlying buffer
+     * @note The size is always rounded up if the current bit offset is not byte-aligned
+     */ 
     std::size_t getSize() const {
         return cur_bit_offset / CHAR_BIT + (cur_bit_offset % CHAR_BIT > 0 ? 1 : 0);
     }
 
+    /**
+     * @return The amount of bits that were written to the underlying buffer
+     */ 
     std::size_t getWidth() const {
         return cur_bit_offset;
     }
 
+    /**
+     * @return The maximum amount of bytes that can be written to the underlying buffer
+     */ 
     std::size_t getMaxSize() const {
         if(cur_buffer == nullptr) {
             return 0;
@@ -98,10 +147,22 @@ public:
         }
     }
 
+    /**
+     * @return true of this stream is currently invalidated, false if the stream functions correctly
+     */ 
     bool badBit() {
         return bad_bit;
     }
 
+    /**
+     * @brief Transfer all the bits (in the underlying buffer) encoded by this
+     *        stream to another stream encoder.    
+     * 
+     * @param out   The stream to which data should be transfered
+     * @param other The stream to transfer
+     * 
+     * @return The input parameter @p out (for sequential encoding)
+     */ 
     friend OBitStream& operator<<(OBitStream& out, const OBitStream& other) {
 
         // can't transfer an out stream into itself
@@ -126,6 +187,15 @@ public:
         return out;
     }
 
+    /**
+     * @brief Encode an arithemtic value in the buffer.
+     * @note This encodes the full value
+     * 
+     * @param out The related OBitStream object
+     * @param value The integral type to encode
+     * 
+     * @return The input parameter @p out (for sequential encoding)
+     */ 
     template<typename T,
              std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
     friend OBitStream& operator<<(OBitStream& out, T value) {
@@ -135,9 +205,11 @@ public:
 
 private:
 
-    //members
+    /** The underlying buffer this stream is currently attached to */
     IBuffer* cur_buffer;
+    /** The current bit offset (where we are in the buffer) */
     std::size_t cur_bit_offset;
+    /** The state bit of the stream */
     bool bad_bit;
 };
 

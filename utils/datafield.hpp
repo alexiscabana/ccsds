@@ -39,6 +39,8 @@ class IField : public Serializable, public Deserializable
  * @code    
  *          Field<uint8_t, 6> field;    // 6-bit field represented on a uint8_t
  *                                      // Field can thus only take values [0..63]
+ *          field.setValue(64);         // 64 = 0b01000000 
+ *          field.getValue() == 0;      //true, because the set() above clears the 6 LSBs
  * @endcode 
  * 
  * @note    For obvious reasons, the bit width must always be lower than or equal to the bit width  
@@ -272,13 +274,13 @@ public:
 
 /**
  * @brief   A collection of single Fields, FieldArrays or even other FieldCollections.
- *          Can contain 0 fields (empty collection), and can have a total bit width that is not divisble by 8
+ *          Can contain 0 fields (empty collection), and can have a total bit width that is not divisible by 8.
  *          FieldCollections are a simple way to hierarchically organize Fields,
  *          as well as group them together intuitively in a certain order.
  *          @see{Field}, @see{FieldArray}. 
  * 
  * @details Every field is stored in a multi-type tuple for easy access. De/serializing FieldCollections will
- *          simply de/serialize each field (in the order specified) by the user.
+ *          simply de/serialize each field on by one, in the order specified by the user as template parameter.
  * 
  * @code    
  *          FieldCollection<> empty;                    // A collection of zero fields 
