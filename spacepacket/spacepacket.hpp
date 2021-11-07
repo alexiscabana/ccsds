@@ -94,6 +94,8 @@ public:
 template<typename SecHdrType, typename Allocator = DefaultAllocator>
 class SpBuilder : public ISpacepacket<SecHdrType>, public Serializable
 {
+    static_assert(std::is_base_of<IAllocator, Allocator>::value, "The chosen allocator is not valid");
+
 public:
     SpBuilder(std::size_t total_size, const Allocator& alloc = Allocator())
     : allocator(alloc) {
@@ -160,6 +162,7 @@ template<typename PatternType = uint8_t,
         typename Allocator = DefaultAllocator>
 class SpIdleBuilder : public SpBuilder<SpEmptySecondaryHeader, Allocator>
 {
+    static_assert(std::is_base_of<IAllocator, Allocator>::value, "The chosen allocator is not valid");
     static_assert(std::is_unsigned<PatternType>::value, 
                     "Only unsigned Idle packet pattern are supported.");
 
@@ -171,7 +174,7 @@ public:
         if(total_size > SpPrimaryHeader::getSize()) {
             std::size_t packet_data_field_size = total_size - SpPrimaryHeader::getSize();
 
-            //Fill all the packet data field bytes to the given pattern
+            //Fill all the packet data field bytes with the given pattern
             std::size_t nb_full_pattern = packet_data_field_size / sizeof(PatternType);
             uint8_t nb_remainder_bytes  = packet_data_field_size % sizeof(PatternType);
             

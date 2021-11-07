@@ -15,6 +15,8 @@ namespace ccsds
 template<typename Allocator = DefaultAllocator>
 class SpTransferService
 {
+    static_assert(std::is_base_of<IAllocator, Allocator>::value, "The chosen allocator is not valid");
+
     /**
      * Predicate for matching spacepackets
      */
