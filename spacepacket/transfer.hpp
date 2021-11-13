@@ -1,7 +1,15 @@
+/**************************************************************************//**
+ * @file transfer.hpp
+ * @author Alexis Cabana-Loriaux
+ * 
+ * @brief Contains a definition of a Spacepacket communication layer
+ * 
+ ******************************************************************************/
 #ifndef PACKETTRANSFERSERVICE_HPP
 #define PACKETTRANSFERSERVICE_HPP
 
 #include "utils/allocator.hpp"
+#include "utils/commlayer.hpp"
 #include "spacepacket/primaryhdr.hpp"
 #include "spacepacket/spacepacket.hpp"
 #include "spacepacket/listener.hpp"
@@ -13,7 +21,7 @@ namespace ccsds
  * Service of spacepacket transfer
  */
 template<typename Allocator = DefaultAllocator>
-class SpTransferService
+class SpTransferService : public ICommunicationLayer
 {
     static_assert(std::is_base_of<IAllocator, Allocator>::value, "The chosen allocator is not valid");
 
@@ -60,12 +68,16 @@ class SpTransferService
     };
 
 public:
-    SpTransferService(const Allocator& alloc = Allocator())
-    : nb_listeners(0), sub_layer(nullptr), allocator(alloc) {
-        
+    SpTransferService(std::size_t nb_listeners_max = 1000, const Allocator& alloc = Allocator())
+    : nb_listeners_max(nb_listeners_max), nb_listeners(0), allocator(alloc) {
+
+        listener_buffer = this->allocator.allocateBuffer(nb_listeners_max * sizeof(ListenerEntry));
+        listener_entries = reinterpret_cast<ListenerEntry*>(listener_buffer.getStart());
     }
 
-    static const std::size_t LISTENERS_MAX_SIZE = 1000;
+    ~SpTransferService() {
+        this->allocator.deallocateBuffer(listener_buffer);
+    }
 
     template<typename SecHdr, typename A>
     void transmit(SpBuilder<SecHdr, A>& sp) {
@@ -106,7 +118,50 @@ public:
         }
     }
 
-    void receiveFromSubLayer(IBuffer& buffer) {
+    void registerListener(SpListener* listener) {
+        if(listener == nullptr || nb_listeners >= nb_listeners_max) {
+            return;
+        }
+
+        SpPrimaryHeader::PacketApid any;
+
+        // add in watchers
+        listener_entries[nb_listeners].listener = listener;
+        new (&listener_entries[nb_listeners].matcher) ListenerPredicate(any, true);
+        nb_listeners++;
+    }
+
+    void registerListener(SpListener* listener, uint16_t apid_value) {
+        if(listener == nullptr || nb_listeners >= nb_listeners_max) {
+            return;
+        }
+
+        SpPrimaryHeader::PacketApid match(apid_value);
+
+        // add in watchers
+        listener_entries[nb_listeners].listener = listener;
+        new (&listener_entries[nb_listeners].matcher) ListenerPredicate(match);
+        nb_listeners++;
+    }
+
+    void unregisterListener(SpListener* listener) {
+        for(uint32_t i = 0; i < nb_listeners; i++) {
+            if(listener_entries[i].listener == listener) {
+                //switch to the listener at the end
+                listener_entries[i] = listener_entries[nb_listeners - 1];
+                nb_listeners--;
+                break;
+            }
+        }
+    }
+    
+    void connectUpperLayer(ICommunicationLayer& upper_layer) override {
+        (void)upper_layer;
+        //do nothing, the spacepacket layer cannot have an upper layer
+    }
+
+private:
+    void receiveFromSubLayer(const IBuffer& buffer) override {
         // TODO: validate RX spacepacket
         // for now just assume SP is valid
         IBitStream in(buffer);
@@ -133,61 +188,18 @@ public:
         }
     }
 
-    void registerListener(SpListener* listener) {
-        if(listener == nullptr || nb_listeners >= LISTENERS_MAX_SIZE) {
-            return;
-        }
-
-        SpPrimaryHeader::PacketApid any;
-
-        // add in watchers
-        listener_entries[nb_listeners].listener = listener;
-        new (&listener_entries[nb_listeners].matcher) ListenerPredicate(any, true);
-        nb_listeners++;
+    void receiveFromUpperLayer(const IBuffer& bytes) override {
+        (void)bytes;
+        //unused, Spacepacket layer is an application layer
     }
 
-    void registerListener(SpListener* listener, uint16_t apid_value) {
-        if(listener == nullptr || nb_listeners >= LISTENERS_MAX_SIZE) {
-            return;
-        }
-
-        SpPrimaryHeader::PacketApid match(apid_value);
-
-        // add in watchers
-        listener_entries[nb_listeners].listener = listener;
-        new (&listener_entries[nb_listeners].matcher) ListenerPredicate(match);
-        nb_listeners++;
-    }
-
-    void unregisterListener(SpListener* listener) {
-        for(uint32_t i = 0; i < nb_listeners; i++) {
-            if(listener_entries[i].listener == listener) {
-                //switch to the listener at the end
-                listener_entries[i] = listener_entries[nb_listeners - 1];
-                nb_listeners--;
-                break;
-            }
-        }
-    }
-
-    void setSubLayerListener(SpListener* listener) {
-        if(listener != nullptr) {
-            sub_layer = listener;
-        }
-    }
-
-    void resetSubLayerListener() {
-        sub_layer = nullptr;
-    }
-
-private:
-    void transmitValidBuffer(uint16_t apid_value, IBuffer& buffer, bool isSubLayerBuffer) {
+    void transmitValidBuffer(uint16_t apid_value, const IBuffer& buffer, bool isSubLayerBuffer) {
         //listeners have to be notified of this new spacepacket
         this->notifyListeners(SpPrimaryHeader::PacketApid(apid_value), buffer);
 
         // only transmit to sub-layer if the buffer doesn't already come from that layer
-        if(!isSubLayerBuffer && sub_layer != nullptr) {
-            sub_layer->newSpacepacket(buffer);
+        if(!isSubLayerBuffer) {
+            this->pushToSubLayer(buffer);
         }
 
         //update current context of the APID
@@ -196,7 +208,7 @@ private:
         ++contexes[apid_value].next_count;
     }
 
-    void notifyListeners(SpPrimaryHeader::PacketApid apid, IBuffer& buffer) {
+    void notifyListeners(SpPrimaryHeader::PacketApid apid, const IBuffer& buffer) {
         for(uint32_t i = 0; i < nb_listeners; i++) {
             if(listener_entries[i].matcher(apid)) {
                 listener_entries[i].listener->newSpacepacket(buffer);
@@ -206,8 +218,10 @@ private:
 
     const Allocator& allocator;
     std::size_t nb_listeners;
-    ListenerEntry listener_entries[LISTENERS_MAX_SIZE];
-    SpListener* sub_layer;
+    const std::size_t nb_listeners_max;
+    ListenerEntry* listener_entries;
+    UserBuffer listener_buffer;
+
     ApidContext contexes[SpPrimaryHeader::PacketApid::IDLE_VALUE + 1];
     Telemetry telemetry;
 };
