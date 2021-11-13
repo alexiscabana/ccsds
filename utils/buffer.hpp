@@ -44,7 +44,10 @@ public:
 
 /**
  * @brief Template class for a buffer of a given amount of bytes. 
- *        WARNING: The memory is held inside the instance.
+ * 
+ * WARNING: The memory is held inside the instance.
+ * 
+ * @tparam Size The size in bytes
  */
 template<std::size_t Size>
 class Buffer : public IBuffer

@@ -35,13 +35,17 @@ class IField : public Serializable, public Deserializable
  *          other bits are considered as "don't care". Fields are powerful when used with 
  *          bitstreams, because they only serialize/deserialize the amount of bits necessary to
  *          hold their value.
- * 
  * @code    
  *          Field<uint8_t, 6> field;    // 6-bit field represented on a uint8_t
  *                                      // Field can thus only take values [0..63]
  *          field.setValue(64);         // 64 = 0b01000000 
  *          field.getValue() == 0;      //true, because the set() above clears the 6 LSBs
  * @endcode 
+ * 
+ * @tparam T The type of the field
+ * @tparam WidthBits The bit width of the field
+ * @tparam IsLittleEndian If the field is interpreted in little-endian mode
+ * 
  * 
  * @note    For obvious reasons, the bit width must always be lower than or equal to the bit width  
  *          of the original type.
@@ -180,6 +184,11 @@ private:
  * @code    
  *          Field<5, uint8_t, 6> field; // Five (5) 6-bit fields represented on a uint8_t
  * @endcode 
+ * 
+ * @tparam Size The amount of fields in the array
+ * @tparam T The type of the field
+ * @tparam WidthBits The bit width of the field
+ * @tparam IsLittleEndian If the field is interpreted in little-endian mode
  */
 template<std::size_t Size, 
          typename T, 
@@ -290,6 +299,9 @@ public:
  *                          FieldArray<3, uint8_t, 2>,
  *                          FieldCollection<>> my_collection;
  * @endcode 
+ * 
+ * @tparam T The first field
+ * @tparam Rest The rest of the fields
  */
 template<typename T, typename... Rest>
 class FieldCollection<T, Rest...> : public IField
@@ -369,8 +381,7 @@ public:
 };
 
 /**
- * @brief   The special case of an empty Field (0-bit Field).
- *          @see{Field} and @see{FieldCollection}. 
+ * The special case of an empty Field (0-bit Field). @see{Field} and @see{FieldCollection}. 
  */
 using FieldEmpty = FieldCollection<>;
 

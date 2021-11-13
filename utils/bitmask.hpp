@@ -14,6 +14,7 @@
  * @brief Create a bitmask with a given amount of ones, starting from bit 0,
  *        increasing in position
  * 
+ * @tparam R the type
  * @param onecount The amount of ones in the bitmask
  * 
  * @return The bitmask
